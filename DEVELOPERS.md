@@ -48,7 +48,16 @@ npm install
 npm run dev
 ```
 
-### Option 6: Plain HTML/CSS/JS
+### Option 6: Astro
+
+```bash
+cd your-name/
+npm create astro@latest .
+npm install
+npm run dev
+```
+
+### Option 7: Plain HTML/CSS/JS
 
 Just create an `index.html` in your folder - no build needed!
 
@@ -67,46 +76,65 @@ Just create an `index.html` in your folder - no build needed!
 </html>
 ```
 
-## Deploy Everything
+## Development Workflow
 
-From the **root directory**, run:
+### 1. Work in Your Folder
 
 ```bash
-npm run build    # Builds all projects
-npm run deploy   # Deploys to Cloudflare Pages
+cd your-name/
+npm run dev      # Start your dev server
 ```
 
-The build script will:
-1. Find your `package.json` (if you have one)
-2. Run `npm install` (if needed)
-3. Run `npm run build` (if you have a build script)
-4. Auto-detect your output directory (dist, build, out, etc.)
-5. Copy everything to the deployment bundle
+Build and test locally first!
 
-## What Gets Deployed
+### 2. Commit Your Work
 
-- **Your URL**: `https://fingerprint.pages.dev/your-name/`
-- **Landing page**: `https://fingerprint.pages.dev/` (shows all projects)
+```bash
+git add .
+git commit -m "Your Name: Brief description of what you built"
+```
+
+### 3. Push to Main
+
+```bash
+git push origin main
+```
+
+### 4. Auto-Deploy! ✨
+
+Cloudflare Pages automatically:
+1. Detects your push to `main`
+2. Runs `npm run build` (builds ALL developer folders)
+3. Deploys everything to production
+4. Usually takes 1-2 minutes
+
+## How the Build Works
+
+When you push, the automated build:
+1. Finds your `package.json` (if you have one)
+2. Runs `npm install` (if needed)
+3. Runs `npm run build` (if you have a build script)
+4. Auto-detects your output directory (dist, build, out, .output/public, etc.)
+5. Combines everyone's work into one deployment
+
+## Your Live URLs
+
+After deployment:
+- **Your project**: `https://fingerprint-3y6.pages.dev/your-name/`
+- **Landing page**: `https://fingerprint-3y6.pages.dev/` (shows all projects)
 
 ## Requirements
 
 Your project just needs:
-- A `package.json` with a `build` script (if using a framework)
-- OR just static HTML files (no build needed)
+- **With a framework**: A `package.json` with a `build` script
+- **Plain HTML**: Just create `index.html` - no build needed
 
-The system handles the rest automatically!
-
-## Local Development
-
-Work in your own folder:
-```bash
-cd your-name/
-npm run dev      # or whatever your framework uses
-```
+The automated build system handles the rest!
 
 ## Tips
 
-- **Test locally first** before deploying
+- **Test locally first** - make sure `npm run build` works in your folder
 - **Add a README** in your folder to explain your approach
-- **Commit often** to save your work
+- **Commit often** - every push triggers a new deployment
+- **Check build logs** in Cloudflare Pages dashboard if something fails
 - **Have fun!** Try different fingerprinting techniques
