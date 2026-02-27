@@ -205,12 +205,28 @@ body {
   color: var(--accent-orange);
 }
 
+.hash-card-readable {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  margin-bottom: 0.4rem;
+}
+
 .hash-card-value {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 0.82rem;
   line-height: 1.6;
   word-break: break-all;
   color: var(--text-primary);
+}
+
+.hash-card-raw {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .hash-card-actions {

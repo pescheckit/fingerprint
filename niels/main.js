@@ -8,6 +8,7 @@ import { AudioCollector } from './src/collectors/audio.js';
 import { FontCollector } from './src/collectors/fonts.js';
 import { MathCollector } from './src/collectors/math.js';
 import { StorageCollector } from './src/collectors/storage.js';
+import { hashToReadableId } from './src/readable-id.js';
 
 const results = document.getElementById('results');
 
@@ -194,9 +195,10 @@ function renderSignalGroup(signal, index) {
       const row = document.createElement('div');
       row.className = 'signal-row';
 
+      const displayKey = key.startsWith('_') ? key.slice(1) : key;
       const label = document.createElement('span');
       label.className = 'signal-label';
-      label.textContent = key;
+      label.textContent = displayKey;
       row.appendChild(label);
 
       const rendered = renderValue(key, value);
@@ -317,9 +319,13 @@ async function collectFingerprint() {
   browserLabel.className = 'hash-card-label';
   browserLabel.textContent = 'Browser Fingerprint';
 
+  const browserId = document.createElement('div');
+  browserId.className = 'hash-card-readable';
+  browserId.textContent = hashToReadableId(result.hash);
+
   const browserHash = document.createElement('div');
   browserHash.id = 'fingerprint-hash';
-  browserHash.className = 'hash-card-value';
+  browserHash.className = 'hash-card-value hash-card-raw';
   browserHash.textContent = result.hash;
 
   const browserActions = document.createElement('div');
@@ -332,6 +338,7 @@ async function collectFingerprint() {
 
   browserActions.appendChild(browserCopy);
   browserCard.appendChild(browserLabel);
+  browserCard.appendChild(browserId);
   browserCard.appendChild(browserHash);
   browserCard.appendChild(browserActions);
 
@@ -343,9 +350,13 @@ async function collectFingerprint() {
   crossLabel.className = 'hash-card-label';
   crossLabel.textContent = 'Cross-Browser ID';
 
+  const crossId = document.createElement('div');
+  crossId.className = 'hash-card-readable';
+  crossId.textContent = result.crossBrowserHash ? hashToReadableId(result.crossBrowserHash) : 'N/A';
+
   const crossHash = document.createElement('div');
   crossHash.id = 'cross-browser-hash';
-  crossHash.className = 'hash-card-value';
+  crossHash.className = 'hash-card-value hash-card-raw';
   crossHash.textContent = result.crossBrowserHash || 'N/A';
 
   const crossActions = document.createElement('div');
@@ -358,12 +369,51 @@ async function collectFingerprint() {
 
   crossActions.appendChild(crossCopy);
   crossCard.appendChild(crossLabel);
+  crossCard.appendChild(crossId);
   crossCard.appendChild(crossHash);
   crossCard.appendChild(crossActions);
 
   hashCards.appendChild(browserCard);
   hashCards.appendChild(crossCard);
   results.appendChild(hashCards);
+
+  // Cross-browser signal debug: show exactly what's being hashed
+  const crossDebug = document.createElement('div');
+  crossDebug.className = 'signal-group fade-in fade-in-delay-2';
+  crossDebug.classList.add('expanded');
+
+  const crossDebugHeader = document.createElement('div');
+  crossDebugHeader.className = 'signal-group-header';
+  crossDebugHeader.innerHTML =
+    '<div class="signal-group-title"><div class="signal-status-badge success"></div>' +
+    '<h3>Cross-Browser Signals</h3>' +
+    '<span class="description">Exact data used for Cross-Browser ID hash</span></div>' +
+    '<div class="signal-group-meta">' + CHEVRON_ICON + '</div>';
+  crossDebugHeader.addEventListener('click', () => {
+    crossDebug.classList.toggle('expanded');
+  });
+  crossDebug.appendChild(crossDebugHeader);
+
+  const crossDebugBody = document.createElement('div');
+  crossDebugBody.className = 'signal-group-body';
+  const crossDebugContent = document.createElement('div');
+  crossDebugContent.className = 'signal-group-content';
+
+  for (const signal of result.signals) {
+    if (!signal.crossBrowserData || Object.keys(signal.crossBrowserData).length === 0) continue;
+    for (const [key, value] of Object.entries(signal.crossBrowserData)) {
+      const row = document.createElement('div');
+      row.className = 'signal-row';
+      row.innerHTML =
+        '<span class="signal-label">' + escapeHtml(signal.name + '.' + key) + '</span>' +
+        '<span class="signal-value">' + escapeHtml(String(value)) + '</span>';
+      crossDebugContent.appendChild(row);
+    }
+  }
+
+  crossDebugBody.appendChild(crossDebugContent);
+  crossDebug.appendChild(crossDebugBody);
+  results.appendChild(crossDebug);
 
   // Signals header
   const signalsHeader = document.createElement('div');

@@ -29,4 +29,42 @@ describe('hashSignals', () => {
     const h2 = await hashSignals(signals);
     expect(h1).toBe(h2);
   });
+
+  it('excludes keys starting with _ from hash', async () => {
+    const hash1 = await hashSignals([
+      { name: 'test', data: { value: 'hello' } },
+    ]);
+
+    const hash2 = await hashSignals([
+      { name: 'test', data: { value: 'hello', _image: 'data:image/png;base64,huge' } },
+    ]);
+
+    expect(hash1).toBe(hash2);
+  });
+
+  it('properly hashes nested objects', async () => {
+    const hash1 = await hashSignals([
+      { name: 'test', data: { metrics: { width: 100, height: 50 } } },
+    ]);
+
+    const hash2 = await hashSignals([
+      { name: 'test', data: { metrics: { width: 100, height: 99 } } },
+    ]);
+
+    // Different nested values should produce different hashes
+    expect(hash1).not.toBe(hash2);
+  });
+
+  it('sorts keys at all nesting levels for stability', async () => {
+    const hash1 = await hashSignals([
+      { name: 'test', data: { a: 1, b: { x: 10, y: 20 } } },
+    ]);
+
+    // Same data but with keys in different insertion order
+    const hash2 = await hashSignals([
+      { name: 'test', data: { b: { y: 20, x: 10 }, a: 1 } },
+    ]);
+
+    expect(hash1).toBe(hash2);
+  });
 });

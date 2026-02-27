@@ -18,6 +18,11 @@ function createMockContext() {
     createLinearGradient: vi.fn(() => ({
       addColorStop: vi.fn(),
     })),
+    measureText: vi.fn(() => ({
+      width: 123.456,
+      actualBoundingBoxAscent: 14.2,
+      actualBoundingBoxDescent: 3.8,
+    })),
     fillStyle: '',
     strokeStyle: '',
     lineWidth: 1,
@@ -48,7 +53,7 @@ describe('CanvasCollector', () => {
     expect(collector.description).toBe('Canvas rendering fingerprint');
   });
 
-  it('returns expected data structure with canvas support', async () => {
+  it('returns text metrics and display-only images', async () => {
     const ctx = createMockContext();
     const mockCanvas = createMockCanvas(ctx);
 
@@ -60,16 +65,45 @@ describe('CanvasCollector', () => {
     const collector = new CanvasCollector();
     const result = await collector.collect();
 
-    expect(result).toEqual({
-      supported: true,
-      geometry: 'data:image/png;base64,mockdata',
-      text: 'data:image/png;base64,mockdata',
-    });
+    expect(result.supported).toBe(true);
+    expect(result.textMetrics).toBeDefined();
+    expect(typeof result.textMetrics).toBe('object');
+    // Images are prefixed with _ (display-only, excluded from hash)
+    expect(result._geometryImage).toBe('data:image/png;base64,mockdata');
+    expect(result._textImage).toBe('data:image/png;base64,mockdata');
 
     vi.restoreAllMocks();
   });
 
-  it('calls canvas drawing methods for geometry', async () => {
+  it('collects text metrics for multiple fonts', async () => {
+    const ctx = createMockContext();
+    const mockCanvas = createMockCanvas(ctx);
+
+    vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'canvas') return mockCanvas;
+      return originalCreateElement.call(document, tag);
+    });
+
+    const collector = new CanvasCollector();
+    const result = await collector.collect();
+
+    // Should measure at least 5 different fonts
+    const fontKeys = Object.keys(result.textMetrics);
+    expect(fontKeys.length).toBeGreaterThanOrEqual(5);
+
+    // Each font should have width, ascent, descent
+    for (const font of fontKeys) {
+      expect(result.textMetrics[font]).toHaveProperty('width');
+      expect(result.textMetrics[font]).toHaveProperty('ascent');
+      expect(result.textMetrics[font]).toHaveProperty('descent');
+    }
+
+    expect(ctx.measureText).toHaveBeenCalled();
+
+    vi.restoreAllMocks();
+  });
+
+  it('calls canvas drawing methods for geometry and text images', async () => {
     const ctx = createMockContext();
     const mockCanvas = createMockCanvas(ctx);
 
@@ -85,25 +119,9 @@ describe('CanvasCollector', () => {
     expect(ctx.fillRect).toHaveBeenCalled();
     expect(ctx.arc).toHaveBeenCalled();
     expect(ctx.stroke).toHaveBeenCalled();
-    expect(mockCanvas.toDataURL).toHaveBeenCalledTimes(2);
-
-    vi.restoreAllMocks();
-  });
-
-  it('calls canvas drawing methods for text', async () => {
-    const ctx = createMockContext();
-    const mockCanvas = createMockCanvas(ctx);
-
-    vi.spyOn(document, 'createElement').mockImplementation((tag) => {
-      if (tag === 'canvas') return mockCanvas;
-      return originalCreateElement.call(document, tag);
-    });
-
-    const collector = new CanvasCollector();
-    await collector.collect();
-
     expect(ctx.fillText).toHaveBeenCalled();
     expect(ctx.strokeText).toHaveBeenCalled();
+    expect(mockCanvas.toDataURL).toHaveBeenCalledTimes(2);
 
     vi.restoreAllMocks();
   });
@@ -126,8 +144,9 @@ describe('CanvasCollector', () => {
 
     expect(result).toEqual({
       supported: false,
-      geometry: null,
-      text: null,
+      textMetrics: null,
+      _geometryImage: null,
+      _textImage: null,
     });
     expect(mockCanvas.toDataURL).not.toHaveBeenCalled();
 

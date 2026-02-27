@@ -2,9 +2,7 @@ import { Collector } from '../collector.js';
 
 export class WebGLCollector extends Collector {
   constructor() {
-    super('webgl', 'WebGL renderer and capabilities', [
-      'maxTextureSize', 'maxRenderbufferSize',
-    ]);
+    super('webgl', 'WebGL renderer and capabilities');
   }
 
   async collect() {

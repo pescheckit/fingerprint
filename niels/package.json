@@ -10,11 +10,15 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test --config playwright.config.js",
     "test:proxy": "playwright test --config playwright.proxy.config.js",
-    "test:tor": "playwright test --config playwright.tor.config.js"
+    "test:tor": "playwright test --config playwright.tor.config.js",
+    "test:cross-browser": "playwright test --config playwright.cross-browser.config.js",
+    "test:tor-browser": "node e2e/tor-browser.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "geckodriver": "^6.1.0",
     "jsdom": "^26.0.0",
+    "selenium-webdriver": "^4.41.0",
     "vite": "^6.0.0",
     "vitest": "^3.0.0"
   }
