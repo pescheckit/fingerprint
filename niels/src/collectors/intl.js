@@ -2,14 +2,7 @@ import { Collector } from '../collector.js';
 
 export class IntlCollector extends Collector {
   constructor() {
-    super('intl', 'Intl API formatting quirks and locale data', [
-      'dateFormat',
-      'numberFormat',
-      'currencyFormat',
-      'listFormat',
-      'pluralCategories',
-      'collation',
-    ]);
+    super('intl', 'Intl API formatting quirks and locale data', []);
   }
 
   async collect() {

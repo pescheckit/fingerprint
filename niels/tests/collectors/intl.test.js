@@ -15,11 +15,8 @@ describe('IntlCollector', () => {
     expect(collector.description).toBe('Intl API formatting quirks and locale data');
   });
 
-  it('has deviceKeys for cross-browser stable signals', () => {
-    expect(collector.deviceKeys).toContain('dateFormat');
-    expect(collector.deviceKeys).toContain('numberFormat');
-    expect(collector.deviceKeys).toContain('currencyFormat');
-    expect(collector.deviceKeys).toContain('collation');
+  it('has empty deviceKeys (Intl output varies by engine)', () => {
+    expect(collector.deviceKeys).toEqual([]);
   });
 
   it('collects all top-level keys', async () => {
