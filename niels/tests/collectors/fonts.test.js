@@ -74,8 +74,8 @@ describe('FontCollector', () => {
     expect(collector.description).toBe('Installed font detection');
   });
 
-  it('has empty crossBrowserKeys (font detection is engine-specific)', () => {
-    expect(collector.crossBrowserKeys).toEqual([]);
+  it('has empty deviceKeys (font detection is engine-specific)', () => {
+    expect(collector.deviceKeys).toEqual([]);
   });
 
   it('measures base font dimensions before testing candidates', async () => {

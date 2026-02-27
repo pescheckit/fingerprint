@@ -15,8 +15,8 @@ describe('MathCollector', () => {
     expect(collector.description).toBe('Math operation fingerprint');
   });
 
-  it('has empty crossBrowserKeys', () => {
-    expect(collector.crossBrowserKeys).toEqual([]);
+  it('has empty deviceKeys', () => {
+    expect(collector.deviceKeys).toEqual([]);
   });
 
   it('collects all expected keys', async () => {

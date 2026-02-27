@@ -13,7 +13,7 @@ describe('StorageCollector', () => {
     expect(collector).toBeInstanceOf(Collector);
     expect(collector.name).toBe('storage');
     expect(collector.description).toBe('Storage and feature detection');
-    expect(collector.crossBrowserKeys).toEqual([]);
+    expect(collector.deviceKeys).toEqual([]);
   });
 
   it('collects all expected keys', async () => {

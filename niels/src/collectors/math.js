@@ -9,7 +9,7 @@ import { Collector } from '../collector.js';
  * variations make the combined set of results a useful fingerprint signal.
  *
  * Because the differences are engine-dependent (not hardware/OS-dependent),
- * crossBrowserKeys is empty — these values are NOT stable across browsers.
+ * deviceKeys is empty — these values are NOT stable across browsers.
  */
 export class MathCollector extends Collector {
   constructor() {

@@ -151,7 +151,7 @@ body {
 
 .hash-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 1rem;
   margin-bottom: 2rem;
 }
@@ -185,8 +185,12 @@ body {
   background: linear-gradient(90deg, var(--accent-green), transparent);
 }
 
-.hash-card.cross-browser::before {
+.hash-card.device-id::before {
   background: linear-gradient(90deg, var(--accent-orange), transparent);
+}
+
+.hash-card.visitor-id::before {
+  background: linear-gradient(90deg, var(--accent-blue), transparent);
 }
 
 .hash-card-label {
@@ -201,8 +205,12 @@ body {
   color: var(--accent-green);
 }
 
-.hash-card.cross-browser .hash-card-label {
+.hash-card.device-id .hash-card-label {
   color: var(--accent-orange);
+}
+
+.hash-card.visitor-id .hash-card-label {
+  color: var(--accent-blue);
 }
 
 .hash-card-readable {

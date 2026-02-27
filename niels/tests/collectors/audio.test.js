@@ -71,7 +71,7 @@ describe('AudioCollector', () => {
     expect(collector).toBeInstanceOf(Collector);
     expect(collector.name).toBe('audio');
     expect(collector.description).toBe('Audio processing fingerprint');
-    expect(collector.crossBrowserKeys).toEqual([]);
+    expect(collector.deviceKeys).toEqual([]);
   });
 
   it('returns expected data structure when audio is supported', async () => {

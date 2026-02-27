@@ -8,7 +8,13 @@ import { AudioCollector } from './src/collectors/audio.js';
 import { FontCollector } from './src/collectors/fonts.js';
 import { MathCollector } from './src/collectors/math.js';
 import { StorageCollector } from './src/collectors/storage.js';
-import { hashToReadableId } from './src/readable-id.js';
+import { JSEngineCollector } from './src/collectors/tor/js-engine.js';
+import { CSSFeaturesCollector } from './src/collectors/tor/css-features.js';
+import { PerformanceProfileCollector } from './src/collectors/tor/performance-profile.js';
+import { FontMetricsCollector } from './src/collectors/tor/font-metrics.js';
+import { FingerprintClient } from './src/client.js';
+
+const API_ENDPOINT = 'https://bingo-barry.nl/fingerprint';
 
 const results = document.getElementById('results');
 
@@ -289,7 +295,11 @@ async function collectFingerprint() {
     .register(new AudioCollector())
     .register(new FontCollector())
     .register(new MathCollector())
-    .register(new StorageCollector());
+    .register(new StorageCollector())
+    .register(new JSEngineCollector())
+    .register(new CSSFeaturesCollector())
+    .register(new PerformanceProfileCollector())
+    .register(new FontMetricsCollector());
 
   const startTime = performance.now();
   const result = await fingerprinter.collect();
@@ -311,7 +321,7 @@ async function collectFingerprint() {
   const hashCards = document.createElement('div');
   hashCards.className = 'hash-cards fade-in fade-in-delay-1';
 
-  // Browser hash card
+  // Browser fingerprint card (green)
   const browserCard = document.createElement('div');
   browserCard.className = 'hash-card browser';
 
@@ -321,12 +331,12 @@ async function collectFingerprint() {
 
   const browserId = document.createElement('div');
   browserId.className = 'hash-card-readable';
-  browserId.textContent = hashToReadableId(result.hash);
+  browserId.textContent = result.readableFingerprint;
 
   const browserHash = document.createElement('div');
   browserHash.id = 'fingerprint-hash';
   browserHash.className = 'hash-card-value hash-card-raw';
-  browserHash.textContent = result.hash;
+  browserHash.textContent = result.fingerprint;
 
   const browserActions = document.createElement('div');
   browserActions.className = 'hash-card-actions';
@@ -334,7 +344,7 @@ async function collectFingerprint() {
   const browserCopy = document.createElement('button');
   browserCopy.className = 'copy-btn';
   browserCopy.innerHTML = COPY_ICON + ' Copy';
-  browserCopy.addEventListener('click', () => copyToClipboard(result.hash, browserCopy));
+  browserCopy.addEventListener('click', () => copyToClipboard(result.fingerprint, browserCopy));
 
   browserActions.appendChild(browserCopy);
   browserCard.appendChild(browserLabel);
@@ -342,78 +352,125 @@ async function collectFingerprint() {
   browserCard.appendChild(browserHash);
   browserCard.appendChild(browserActions);
 
-  // Cross-browser hash card
-  const crossCard = document.createElement('div');
-  crossCard.className = 'hash-card cross-browser';
+  // Device ID card (orange)
+  const deviceCard = document.createElement('div');
+  deviceCard.className = 'hash-card device-id';
 
-  const crossLabel = document.createElement('div');
-  crossLabel.className = 'hash-card-label';
-  crossLabel.textContent = 'Cross-Browser ID';
+  const deviceLabel = document.createElement('div');
+  deviceLabel.className = 'hash-card-label';
+  deviceLabel.textContent = 'Device ID';
 
-  const crossId = document.createElement('div');
-  crossId.className = 'hash-card-readable';
-  crossId.textContent = result.crossBrowserHash ? hashToReadableId(result.crossBrowserHash) : 'N/A';
+  const deviceReadable = document.createElement('div');
+  deviceReadable.className = 'hash-card-readable';
+  deviceReadable.textContent = result.readableDeviceId || 'N/A';
 
-  const crossHash = document.createElement('div');
-  crossHash.id = 'cross-browser-hash';
-  crossHash.className = 'hash-card-value hash-card-raw';
-  crossHash.textContent = result.crossBrowserHash || 'N/A';
+  const deviceHash = document.createElement('div');
+  deviceHash.id = 'device-id';
+  deviceHash.className = 'hash-card-value hash-card-raw';
+  deviceHash.textContent = result.deviceId || 'N/A';
 
-  const crossActions = document.createElement('div');
-  crossActions.className = 'hash-card-actions';
+  const deviceActions = document.createElement('div');
+  deviceActions.className = 'hash-card-actions';
 
-  const crossCopy = document.createElement('button');
-  crossCopy.className = 'copy-btn';
-  crossCopy.innerHTML = COPY_ICON + ' Copy';
-  crossCopy.addEventListener('click', () => copyToClipboard(result.crossBrowserHash || 'N/A', crossCopy));
+  const deviceCopy = document.createElement('button');
+  deviceCopy.className = 'copy-btn';
+  deviceCopy.innerHTML = COPY_ICON + ' Copy';
+  deviceCopy.addEventListener('click', () => copyToClipboard(result.deviceId || 'N/A', deviceCopy));
 
-  crossActions.appendChild(crossCopy);
-  crossCard.appendChild(crossLabel);
-  crossCard.appendChild(crossId);
-  crossCard.appendChild(crossHash);
-  crossCard.appendChild(crossActions);
+  deviceActions.appendChild(deviceCopy);
+  deviceCard.appendChild(deviceLabel);
+  deviceCard.appendChild(deviceReadable);
+  deviceCard.appendChild(deviceHash);
+  deviceCard.appendChild(deviceActions);
+
+  // Visitor ID card (blue)
+  const visitorCard = document.createElement('div');
+  visitorCard.className = 'hash-card visitor-id';
+
+  const visitorLabel = document.createElement('div');
+  visitorLabel.className = 'hash-card-label';
+  visitorLabel.textContent = 'Visitor ID';
+
+  const visitorReadable = document.createElement('div');
+  visitorReadable.className = 'hash-card-readable';
+  visitorReadable.textContent = result.visitorId || 'N/A';
+
+  const visitorHash = document.createElement('div');
+  visitorHash.id = 'visitor-id';
+  visitorHash.className = 'hash-card-value hash-card-raw';
+  visitorHash.textContent = result.visitorId || 'N/A';
+
+  const visitorActions = document.createElement('div');
+  visitorActions.className = 'hash-card-actions';
+
+  const visitorCopy = document.createElement('button');
+  visitorCopy.className = 'copy-btn';
+  visitorCopy.innerHTML = COPY_ICON + ' Copy';
+  visitorCopy.addEventListener('click', () => copyToClipboard(result.visitorId || 'N/A', visitorCopy));
+
+  visitorActions.appendChild(visitorCopy);
+  visitorCard.appendChild(visitorLabel);
+  visitorCard.appendChild(visitorReadable);
+  visitorCard.appendChild(visitorHash);
+  visitorCard.appendChild(visitorActions);
 
   hashCards.appendChild(browserCard);
-  hashCards.appendChild(crossCard);
+  hashCards.appendChild(deviceCard);
+  hashCards.appendChild(visitorCard);
   results.appendChild(hashCards);
 
-  // Cross-browser signal debug: show exactly what's being hashed
-  const crossDebug = document.createElement('div');
-  crossDebug.className = 'signal-group fade-in fade-in-delay-2';
-  crossDebug.classList.add('expanded');
-
-  const crossDebugHeader = document.createElement('div');
-  crossDebugHeader.className = 'signal-group-header';
-  crossDebugHeader.innerHTML =
-    '<div class="signal-group-title"><div class="signal-status-badge success"></div>' +
-    '<h3>Cross-Browser Signals</h3>' +
-    '<span class="description">Exact data used for Cross-Browser ID hash</span></div>' +
-    '<div class="signal-group-meta">' + CHEVRON_ICON + '</div>';
-  crossDebugHeader.addEventListener('click', () => {
-    crossDebug.classList.toggle('expanded');
+  // Submit to server for probabilistic matching
+  const client = new FingerprintClient(API_ENDPOINT);
+  client.submit(result).then(serverResult => {
+    if (serverResult.matchedVisitorId) {
+      visitorReadable.textContent = 'Matched (confidence: ' + (serverResult.confidence * 100).toFixed(0) + '%)';
+      visitorReadable.style.color = 'var(--accent-green)';
+    }
+    // Store ETag for persistence
+    if (result.visitorId) {
+      client.storeEtag(result.visitorId);
+    }
+  }).catch(() => {
+    // Server unavailable — visitor ID still works locally via persistence layer
   });
-  crossDebug.appendChild(crossDebugHeader);
 
-  const crossDebugBody = document.createElement('div');
-  crossDebugBody.className = 'signal-group-body';
-  const crossDebugContent = document.createElement('div');
-  crossDebugContent.className = 'signal-group-content';
+  // Device signal debug: show exactly what's being hashed
+  const deviceDebug = document.createElement('div');
+  deviceDebug.className = 'signal-group fade-in fade-in-delay-2';
+  deviceDebug.classList.add('expanded');
+
+  const deviceDebugHeader = document.createElement('div');
+  deviceDebugHeader.className = 'signal-group-header';
+  deviceDebugHeader.innerHTML =
+    '<div class="signal-group-title"><div class="signal-status-badge success"></div>' +
+    '<h3>Device Signals</h3>' +
+    '<span class="description">Exact data used for Device ID hash</span></div>' +
+    '<div class="signal-group-meta">' + CHEVRON_ICON + '</div>';
+  deviceDebugHeader.addEventListener('click', () => {
+    deviceDebug.classList.toggle('expanded');
+  });
+  deviceDebug.appendChild(deviceDebugHeader);
+
+  const deviceDebugBody = document.createElement('div');
+  deviceDebugBody.className = 'signal-group-body';
+  const deviceDebugContent = document.createElement('div');
+  deviceDebugContent.className = 'signal-group-content';
 
   for (const signal of result.signals) {
-    if (!signal.crossBrowserData || Object.keys(signal.crossBrowserData).length === 0) continue;
-    for (const [key, value] of Object.entries(signal.crossBrowserData)) {
+    if (!signal.deviceData || Object.keys(signal.deviceData).length === 0) continue;
+    for (const [key, value] of Object.entries(signal.deviceData)) {
       const row = document.createElement('div');
       row.className = 'signal-row';
       row.innerHTML =
         '<span class="signal-label">' + escapeHtml(signal.name + '.' + key) + '</span>' +
         '<span class="signal-value">' + escapeHtml(String(value)) + '</span>';
-      crossDebugContent.appendChild(row);
+      deviceDebugContent.appendChild(row);
     }
   }
 
-  crossDebugBody.appendChild(crossDebugContent);
-  crossDebug.appendChild(crossDebugBody);
-  results.appendChild(crossDebug);
+  deviceDebugBody.appendChild(deviceDebugContent);
+  deviceDebug.appendChild(deviceDebugBody);
+  results.appendChild(deviceDebug);
 
   // Signals header
   const signalsHeader = document.createElement('div');

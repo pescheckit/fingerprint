@@ -1,10 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Fingerprinter } from '../src/fingerprinter.js';
 import { Collector } from '../src/collector.js';
 
+vi.mock('../src/persistence/visitor-id-manager.js', () => ({
+  VisitorIdManager: class {
+    async resolve() {
+      return { visitorId: 'mock-uuid-1234-5678-9abc', isNew: true, sources: [] };
+    }
+  },
+}));
+
 class FakeCollector extends Collector {
-  constructor(name, data, crossBrowserKeys = []) {
-    super(name, `Fake ${name}`, crossBrowserKeys);
+  constructor(name, data, deviceKeys = []) {
+    super(name, `Fake ${name}`, deviceKeys);
     this._data = data;
   }
 
@@ -31,7 +39,7 @@ describe('Fingerprinter', () => {
 
     const result = await fp.collect();
 
-    expect(result.hash).toBeTruthy();
+    expect(result.fingerprint).toBeTruthy();
     expect(result.signals).toHaveLength(2);
     expect(result.signals[0].name).toBe('a');
     expect(result.signals[0].data).toEqual({ value: 1 });
@@ -61,7 +69,7 @@ describe('Fingerprinter', () => {
     const r1 = await fp1.collect();
     const r2 = await fp2.collect();
 
-    expect(r1.hash).toBe(r2.hash);
+    expect(r1.fingerprint).toBe(r2.fingerprint);
   });
 
   it('produces different hashes for different inputs', async () => {
@@ -74,7 +82,7 @@ describe('Fingerprinter', () => {
     const r1 = await fp1.collect();
     const r2 = await fp2.collect();
 
-    expect(r1.hash).not.toBe(r2.hash);
+    expect(r1.fingerprint).not.toBe(r2.fingerprint);
   });
 
   it('supports method chaining for register()', () => {
@@ -83,24 +91,24 @@ describe('Fingerprinter', () => {
     expect(result).toBe(fp);
   });
 
-  it('produces a cross-browser hash from tagged keys', async () => {
+  it('produces a device ID from tagged keys', async () => {
     const fp = new Fingerprinter();
     fp.register(new FakeCollector('screen', { width: 1920, height: 1080, ua: 'Chrome' }, ['width', 'height']));
     fp.register(new FakeCollector('canvas', { rendered: 'abc123' }));
 
     const result = await fp.collect();
 
-    expect(result.hash).toBeTruthy();
-    expect(result.crossBrowserHash).toBeTruthy();
-    expect(result.crossBrowserHash).not.toBe(result.hash);
+    expect(result.fingerprint).toBeTruthy();
+    expect(result.deviceId).toBeTruthy();
+    expect(result.deviceId).not.toBe(result.fingerprint);
 
-    // crossBrowserData should only have tagged keys
-    expect(result.signals[0].crossBrowserData).toEqual({ width: 1920, height: 1080 });
-    // canvas has no cross-browser keys
-    expect(result.signals[1].crossBrowserData).toBeNull();
+    // deviceData should only have tagged keys
+    expect(result.signals[0].deviceData).toEqual({ width: 1920, height: 1080 });
+    // canvas has no device keys
+    expect(result.signals[1].deviceData).toBeNull();
   });
 
-  it('cross-browser hash is same regardless of browser-specific signals', async () => {
+  it('device ID is same regardless of browser-specific signals', async () => {
     const fp1 = new Fingerprinter();
     fp1.register(new FakeCollector('hw', { cores: 8, ua: 'Chrome/120' }, ['cores']));
 
@@ -111,18 +119,57 @@ describe('Fingerprinter', () => {
     const r2 = await fp2.collect();
 
     // Full hashes differ (different ua)
-    expect(r1.hash).not.toBe(r2.hash);
-    // Cross-browser hashes match (same cores)
-    expect(r1.crossBrowserHash).toBe(r2.crossBrowserHash);
+    expect(r1.fingerprint).not.toBe(r2.fingerprint);
+    // Device IDs match (same cores)
+    expect(r1.deviceId).toBe(r2.deviceId);
   });
 
-  it('cross-browser hash is null when no collectors have cross-browser keys', async () => {
+  it('device ID is null when no collectors have device keys', async () => {
     const fp = new Fingerprinter();
     fp.register(new FakeCollector('canvas', { data: 'abc' }));
 
     const result = await fp.collect();
 
-    expect(result.hash).toBeTruthy();
-    expect(result.crossBrowserHash).toBeNull();
+    expect(result.fingerprint).toBeTruthy();
+    expect(result.deviceId).toBeNull();
+  });
+
+  it('returns the full result shape with all expected fields', async () => {
+    const fp = new Fingerprinter();
+    fp.register(new FakeCollector('screen', { width: 1920 }, ['width']));
+
+    const result = await fp.collect();
+
+    expect(result).toHaveProperty('fingerprint');
+    expect(result).toHaveProperty('deviceId');
+    expect(result).toHaveProperty('visitorId');
+    expect(result).toHaveProperty('readableFingerprint');
+    expect(result).toHaveProperty('readableDeviceId');
+    expect(result).toHaveProperty('serverMatch', null);
+    expect(result).toHaveProperty('signals');
+
+    expect(typeof result.fingerprint).toBe('string');
+    expect(typeof result.readableFingerprint).toBe('string');
+    expect(result.readableFingerprint).toMatch(/^.+-.+-.+-.+$/);
+    expect(typeof result.readableDeviceId).toBe('string');
+    expect(result.readableDeviceId).toMatch(/^.+-.+-.+-.+$/);
+  });
+
+  it('includes visitorId from VisitorIdManager', async () => {
+    const fp = new Fingerprinter();
+    fp.register(new FakeCollector('a', { value: 1 }));
+
+    const result = await fp.collect();
+
+    expect(result.visitorId).toBe('mock-uuid-1234-5678-9abc');
+  });
+
+  it('disables visitor ID when options.visitorId is false', async () => {
+    const fp = new Fingerprinter({ visitorId: false });
+    fp.register(new FakeCollector('a', { value: 1 }));
+
+    const result = await fp.collect();
+
+    expect(result.visitorId).toBeNull();
   });
 });

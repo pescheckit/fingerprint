@@ -8,14 +8,14 @@ export class Collector {
   /**
    * @param {string} name - Unique identifier for this collector (e.g., 'canvas', 'webgl')
    * @param {string} description - Human-readable description of what this collector does
-   * @param {string[]} [crossBrowserKeys=[]] - Keys from collect() that are stable across browsers.
+   * @param {string[]} [deviceKeys=[]] - Keys from collect() that are stable across browsers.
    *        These are hardware/OS-dependent signals, not browser-engine-dependent.
-   *        Used to generate a cross-browser fingerprint hash.
+   *        Used to generate a cross-browser device ID hash.
    */
-  constructor(name, description, crossBrowserKeys = []) {
+  constructor(name, description, deviceKeys = []) {
     this.name = name;
     this.description = description;
-    this.crossBrowserKeys = crossBrowserKeys;
+    this.deviceKeys = deviceKeys;
   }
 
   /**
