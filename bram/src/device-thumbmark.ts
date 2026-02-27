@@ -30,12 +30,15 @@ import {
   AudioModule,
   ScreenModule,
   PerformanceModule,
-  SystemModule
+  SystemModule,
+  WebRTCLeakModule,
+  NetworkTimingModule
 } from './modules/fingerprint';
 
 // Detection modules
 import {
-  TorDetectionModule
+  TorDetectionModule,
+  VPNDetectorModule
 } from './modules/detection';
 
 export class DeviceThumbmark {
@@ -64,6 +67,9 @@ export class DeviceThumbmark {
 
       // TIER 2: BROWSER-SPECIFIC (extra entropy on normal browsers)
       new TorDetectionModule(),       // Tor detection - 8 bits, 90%
+      new VPNDetectorModule(),        // VPN detection - 0 bits (detection only) 🆕
+      new WebRTCLeakModule(),         // IP leak - 10 bits, 85% (proxy-resistant!) 🆕
+      new NetworkTimingModule(),      // Network timing - 8 bits, 75% (proxy-resistant!) 🆕
       new WebGLModule(),              // GPU strings - 12 bits, 95% (spoofed on Tor)
       new WebGLRenderModule(),        // GPU rendering - 10 bits, 95% (randomized on Tor)
       new ScreenModule(),             // Exact dims - 8 bits, 95% (rounded on Tor)

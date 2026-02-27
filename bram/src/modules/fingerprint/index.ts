@@ -18,3 +18,7 @@ export { AudioModule } from './audio';
 export { ScreenModule } from './screen';
 export { PerformanceModule } from './performance';
 export { SystemModule } from './system';
+
+// Proxy-resistant modules (Educational/Research)
+export { WebRTCLeakModule } from './webrtc-leak';
+export { NetworkTimingModule } from './network-timing';
