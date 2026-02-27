@@ -81,6 +81,16 @@ export class FingerprintClient {
     return probes || [];
   }
 
+  async updateMouse(visitorId, mouseData) {
+    const response = await fetch(`${this.endpoint}/api/fingerprint/mouse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visitorId, ...mouseData }),
+    });
+    if (!response.ok) throw new Error(`Server error: ${response.status}`);
+    return response.json();
+  }
+
   async storeEtag(visitorId) {
     const response = await fetch(`${this.endpoint}/api/etag-store`, {
       method: 'POST',

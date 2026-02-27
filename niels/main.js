@@ -18,6 +18,7 @@ import { IntlCollector } from './src/collectors/intl.js';
 import { WebRTCCollector } from './src/collectors/network/webrtc.js';
 import { DnsProbeCollector } from './src/collectors/network/dns-probe.js';
 import { BatteryCollector } from './src/collectors/network/battery.js';
+import { MouseCollector } from './src/collectors/network/mouse.js';
 import { FingerprintClient } from './src/client.js';
 
 const API_ENDPOINT = 'https://bingo-barry.nl/fingerprint';
@@ -26,7 +27,7 @@ const results = document.getElementById('results');
 // --- Category system ---
 const CATEGORIES = {
   core:     { label: 'Core',     accent: '--cyan',   signals: ['canvas', 'webgl', 'audio', 'math'] },
-  hardware: { label: 'Hardware', accent: '--amber',  signals: ['navigator', 'screen', 'webgpu', 'battery'] },
+  hardware: { label: 'Hardware', accent: '--amber',  signals: ['navigator', 'screen', 'webgpu', 'battery', 'mouse'] },
   network:  { label: 'Network',  accent: '--purple', signals: ['timezone', 'webrtc', 'dns-probe'] },
   privacy:  { label: 'Privacy',  accent: '--green',  signals: ['storage', 'fonts', 'cssFeatures'] },
   advanced: { label: 'Advanced', accent: '--blue',   signals: ['jsEngine', 'performanceProfile', 'fontMetrics', 'media', 'intl'] },
@@ -256,11 +257,25 @@ function renderValue(key, value) {
   return container;
 }
 
+// Category color map for CSS variable injection
+const CATEGORY_COLORS = {
+  core: '--cyan',
+  hardware: '--amber',
+  network: '--purple',
+  privacy: '--green',
+  advanced: '--magenta',
+};
+
 // --- Signal card renderer ---
 function renderSignalCard(signal, maxDuration) {
   const card = document.createElement('div');
   card.className = 'signal-card';
   card.dataset.signal = signal.name;
+
+  // Inject category color
+  const cat = categorize(signal.name);
+  const colorVar = CATEGORY_COLORS[cat] || '--cyan';
+  card.style.setProperty('--cat-color', 'var(' + colorVar + ')');
 
   const collapsed = COLLAPSED_BY_DEFAULT.includes(signal.name);
   if (!collapsed) card.classList.add('expanded');
@@ -372,7 +387,7 @@ function showLoading() {
 
   const allSignals = ['canvas', 'webgl', 'navigator', 'screen', 'timezone', 'audio',
     'fonts', 'math', 'storage', 'jsEngine', 'cssFeatures', 'performanceProfile',
-    'fontMetrics', 'webgpu', 'media', 'intl', 'webrtc', 'battery', 'dns-probe'];
+    'fontMetrics', 'webgpu', 'media', 'intl', 'webrtc', 'battery', 'dns-probe', 'mouse'];
 
   allSignals.forEach(name => {
     const el = document.createElement('span');
@@ -563,6 +578,8 @@ function buildDashboard(result, totalTime) {
         const header = document.createElement('div');
         header.className = 'category-header cascade';
         header.style.animationDelay = (0.25 + delay * 0.03) + 's';
+        header.style.color = 'var(' + cat.accent + ')';
+        header.style.setProperty('--cat-color', 'var(' + cat.accent + ')');
         header.textContent = cat.label;
         grid.appendChild(header);
         delay++;
@@ -734,6 +751,7 @@ async function collectFingerprint() {
     }
   }
 
+  const mouseCollector = new MouseCollector();
   const dnsProbeCollector = new DnsProbeCollector();
   try {
     const probes = await client.fetchDnsProbes();
@@ -762,6 +780,7 @@ async function collectFingerprint() {
     .register(new IntlCollector())
     .register(new WebRTCCollector())
     .register(new BatteryCollector())
+    .register(mouseCollector)
     .register(dnsProbeCollector);
 
   const startTime = performance.now();
@@ -773,9 +792,19 @@ async function collectFingerprint() {
   // Build the dashboard UI
   const refs = buildDashboard(result, totalTime);
 
+  // Start background mouse observation, send update when done
+  const effectiveVisitorIdRef = { value: result.visitorId };
+  mouseCollector.observe(10000).then(mouseData => {
+    if (mouseData.scrollSampleCount > 0 || mouseData.moveSampleCount > 0) {
+      client.updateMouse(effectiveVisitorIdRef.value, mouseData).catch(() => {});
+    }
+    mouseCollector.destroy();
+  });
+
   // Submit to server for probabilistic matching
   client.submit(result).then(async serverResult => {
     const effectiveVisitorId = serverResult.matchedVisitorId || result.visitorId;
+    effectiveVisitorIdRef.value = effectiveVisitorId;
     if (effectiveVisitorId) {
       client.storeEtag(effectiveVisitorId).catch(() => {});
     }

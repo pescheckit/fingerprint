@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateMatchScore, findBestMatch, calculateCrossDeviceScore, findBestCrossDeviceMatch, CROSS_DEVICE_WEIGHTS } from './matching.js';
+import { calculateMatchScore, findBestMatch, calculateCrossDeviceScore, findBestCrossDeviceMatch, CROSS_DEVICE_WEIGHTS, WEIGHTS } from './matching.js';
 
 // Helper: a full stored profile row (as returned from SQLite)
 function makeStoredProfile(overrides = {}) {
@@ -22,6 +22,8 @@ function makeStoredProfile(overrides = {}) {
     platform: 'Linux x86_64',
     touch_support: 0,
     color_depth: 24,
+    pointer_type: 'fine',
+    wheel_delta_y: 120,
     created_at: '2026-01-01 00:00:00',
     updated_at: '2026-01-01 00:00:00',
     ...overrides,
@@ -45,6 +47,8 @@ function makeIncoming(overrides = {}) {
     platform: 'Linux x86_64',
     touchSupport: 0,
     colorDepth: 24,
+    pointerType: 'fine',
+    wheelDeltaY: 120,
     ...overrides,
   };
 }
@@ -55,8 +59,8 @@ describe('calculateMatchScore', () => {
     const stored = makeStoredProfile();
     const { score, matchedSignals } = calculateMatchScore(incoming, stored);
 
-    assert.equal(score, 1.0);
-    assert.equal(matchedSignals.length, 12);
+    assert.ok(Math.abs(score - 1.0) < 0.001, `Expected score ~1.0, got ${score}`);
+    assert.equal(matchedSignals.length, 14);
   });
 
   it('returns 0 when no signals match', () => {
@@ -74,6 +78,8 @@ describe('calculateMatchScore', () => {
       touchSupport: 1,
       colorDepth: 32,
       deviceId: 'different-device',
+      pointerType: 'coarse',
+      wheelDeltaY: 999,
     });
     const stored = makeStoredProfile();
     const { score, matchedSignals } = calculateMatchScore(incoming, stored);
@@ -122,6 +128,7 @@ describe('calculateMatchScore', () => {
       languages: '["zh"]', screenWidth: 3840, screenHeight: 2160,
       hardwareConcurrency: 4, deviceMemory: 8, platform: 'Win32',
       touchSupport: 1, colorDepth: 32, deviceId: 'different',
+      pointerType: 'coarse', wheelDeltaY: 999,
     });
     const { score } = calculateMatchScore(ipOnly, stored);
     assert.ok(Math.abs(score - 0.15) < 0.001, `IP subnet weight should be 0.15, got ${score}`);
@@ -185,6 +192,7 @@ describe('findBestMatch', () => {
       touchSupport: 1,
       colorDepth: 32,
       deviceId: 'different',
+      pointerType: 'coarse', wheelDeltaY: 999,
     });
     const profiles = [makeStoredProfile()];
     const result = findBestMatch(incoming, profiles);
@@ -211,7 +219,7 @@ describe('findBestMatch', () => {
         timezoneOffset: 480, languages: '["zh"]', screenWidth: 3840,
         screenHeight: 2160, hardwareConcurrency: 4, deviceMemory: 8,
         platform: 'Win32', touchSupport: 1, colorDepth: 32,
-        deviceId: 'different',
+        deviceId: 'different', pointerType: 'coarse', wheelDeltaY: 999,
       }),
       profiles,
       0.0,
@@ -383,5 +391,67 @@ describe('findBestCrossDeviceMatch', () => {
     const incoming = makeCrossDeviceIncoming();
     const result = findBestCrossDeviceMatch(incoming, []);
     assert.equal(result, null);
+  });
+});
+
+describe('mouse signal matching', () => {
+  it('matches pointerType exactly', () => {
+    const incoming = makeIncoming({ pointerType: 'fine' });
+    const stored = makeStoredProfile({ pointer_type: 'fine' });
+    const { matchedSignals } = calculateMatchScore(incoming, stored);
+    assert.ok(matchedSignals.includes('pointerType'));
+  });
+
+  it('does not match different pointerType', () => {
+    const incoming = makeIncoming({ pointerType: 'coarse' });
+    const stored = makeStoredProfile({ pointer_type: 'fine' });
+    const { matchedSignals } = calculateMatchScore(incoming, stored);
+    assert.ok(!matchedSignals.includes('pointerType'));
+  });
+
+  it('does not match null pointerType', () => {
+    const incoming = makeIncoming({ pointerType: null });
+    const stored = makeStoredProfile({ pointer_type: 'fine' });
+    const { matchedSignals } = calculateMatchScore(incoming, stored);
+    assert.ok(!matchedSignals.includes('pointerType'));
+  });
+
+  it('matches wheelDeltaY within 5% tolerance', () => {
+    const stored = makeStoredProfile({ wheel_delta_y: 120 });
+
+    // Exact match
+    const exact = makeIncoming({ wheelDeltaY: 120 });
+    const result1 = calculateMatchScore(exact, stored);
+    assert.ok(result1.matchedSignals.includes('wheelDelta'));
+
+    // Within 5% (4% off)
+    const within = makeIncoming({ wheelDeltaY: 124.8 });
+    const result2 = calculateMatchScore(within, stored);
+    assert.ok(result2.matchedSignals.includes('wheelDelta'));
+
+    // Beyond 5%
+    const beyond = makeIncoming({ wheelDeltaY: 130 });
+    const result3 = calculateMatchScore(beyond, stored);
+    assert.ok(!result3.matchedSignals.includes('wheelDelta'));
+  });
+
+  it('does not match null wheelDeltaY', () => {
+    const incoming = makeIncoming({ wheelDeltaY: null });
+    const stored = makeStoredProfile({ wheel_delta_y: 120 });
+    const { matchedSignals } = calculateMatchScore(incoming, stored);
+    assert.ok(!matchedSignals.includes('wheelDelta'));
+  });
+
+  it('pointerType weight is 0.02', () => {
+    assert.ok(Math.abs(WEIGHTS.pointerType - 0.02) < 0.001);
+  });
+
+  it('wheelDelta weight is 0.01', () => {
+    assert.ok(Math.abs(WEIGHTS.wheelDelta - 0.01) < 0.001);
+  });
+
+  it('all weights still sum to 1.0', () => {
+    const total = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(total - 1.0) < 0.001, `Weights sum to ${total}, expected 1.0`);
   });
 });

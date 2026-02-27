@@ -64,6 +64,11 @@ export class Store {
       'ALTER TABLE profiles ADD COLUMN last_active TEXT',
       'ALTER TABLE profiles ADD COLUMN battery_level REAL',
       'ALTER TABLE profiles ADD COLUMN battery_charging INTEGER',
+      'ALTER TABLE profiles ADD COLUMN pointer_type TEXT',
+      'ALTER TABLE profiles ADD COLUMN wheel_delta_y REAL',
+      'ALTER TABLE profiles ADD COLUMN wheel_delta_mode INTEGER',
+      'ALTER TABLE profiles ADD COLUMN smooth_scroll INTEGER',
+      'ALTER TABLE profiles ADD COLUMN movement_min_step REAL',
     ];
     for (const sql of newColumns) {
       try { this.db.exec(sql); } catch { /* column already exists */ }
@@ -144,6 +149,16 @@ export class Store {
       findHouseholdMembers: this.db.prepare(
         'SELECT * FROM profiles WHERE household_id = ? ORDER BY last_active DESC'
       ),
+      updateMouse: this.db.prepare(`
+        UPDATE profiles SET
+          pointer_type = @pointer_type,
+          wheel_delta_y = @wheel_delta_y,
+          wheel_delta_mode = @wheel_delta_mode,
+          smooth_scroll = @smooth_scroll,
+          movement_min_step = @movement_min_step,
+          updated_at = datetime('now')
+        WHERE visitor_id = @visitor_id
+      `),
       updateLastActive: this.db.prepare(
         "UPDATE profiles SET last_active = datetime('now') WHERE visitor_id = @visitor_id"
       ),
@@ -283,6 +298,17 @@ export class Store {
 
   findHouseholdMembers(householdId) {
     return this._stmts.findHouseholdMembers.all(householdId);
+  }
+
+  updateMouse(visitorId, data) {
+    return this._stmts.updateMouse.run({
+      visitor_id: visitorId,
+      pointer_type: data.pointerType || null,
+      wheel_delta_y: data.wheelDeltaY ?? null,
+      wheel_delta_mode: data.wheelDeltaMode ?? null,
+      smooth_scroll: data.smoothScroll != null ? (data.smoothScroll ? 1 : 0) : null,
+      movement_min_step: data.movementMinStep ?? null,
+    });
   }
 
   updateLastActive(visitorId) {

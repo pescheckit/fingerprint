@@ -118,6 +118,22 @@ app.post('/api/fingerprint', (req, res) => {
   }
 });
 
+// POST /api/fingerprint/mouse — update mouse input data for a visitor
+app.post('/api/fingerprint/mouse', (req, res) => {
+  try {
+    const { visitorId, ...mouseData } = req.body;
+    if (!visitorId || typeof visitorId !== 'string') {
+      return res.status(400).json({ error: 'visitorId is required' });
+    }
+
+    store.updateMouse(visitorId, mouseData);
+    res.json({ updated: true });
+  } catch (err) {
+    console.error('POST /api/fingerprint/mouse error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/etag-store — ETag-based visitor ID persistence
 app.get('/api/etag-store', (req, res) => {
   try {

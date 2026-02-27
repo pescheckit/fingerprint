@@ -1,4 +1,4 @@
-const WEIGHTS = {
+export const WEIGHTS = {
   ipSubnet:           0.15,
   audio:              0.12,
   timezone:           0.10,
@@ -7,10 +7,12 @@ const WEIGHTS = {
   hardwareConcurrency: 0.08,
   deviceMemory:       0.08,
   platform:           0.07,
-  touchSupport:       0.05,
-  colorDepth:         0.05,
+  touchSupport:       0.04,
+  colorDepth:         0.03,
   timezoneOffset:     0.05,
   deviceId:           0.05,
+  pointerType:        0.02,
+  wheelDelta:         0.01,
 };
 
 export function calculateMatchScore(incoming, stored) {
@@ -102,6 +104,21 @@ export function calculateMatchScore(incoming, stored) {
   if (incoming.deviceId && stored.device_id && incoming.deviceId === stored.device_id) {
     score += WEIGHTS.deviceId;
     matchedSignals.push('deviceId');
+  }
+
+  // Pointer type (exact match: fine/coarse/none)
+  if (incoming.pointerType && stored.pointer_type && incoming.pointerType === stored.pointer_type) {
+    score += WEIGHTS.pointerType;
+    matchedSignals.push('pointerType');
+  }
+
+  // Wheel delta (wheelDeltaY within 5% tolerance)
+  if (incoming.wheelDeltaY != null && stored.wheel_delta_y != null) {
+    const tolerance = Math.abs(stored.wheel_delta_y) * 0.05;
+    if (Math.abs(incoming.wheelDeltaY - stored.wheel_delta_y) <= tolerance) {
+      score += WEIGHTS.wheelDelta;
+      matchedSignals.push('wheelDelta');
+    }
   }
 
   return { score, matchedSignals };

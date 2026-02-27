@@ -298,6 +298,60 @@ describe('Store', () => {
     });
   });
 
+  describe('updateMouse', () => {
+    it('updates mouse fields for an existing profile', () => {
+      store.saveProfile(makeProfileData({ visitor_id: 'v-mouse' }));
+
+      const result = store.updateMouse('v-mouse', {
+        pointerType: 'fine',
+        wheelDeltaY: 120,
+        wheelDeltaMode: 0,
+        smoothScroll: false,
+        movementMinStep: 1,
+      });
+
+      assert.ok(result.changes >= 1);
+
+      const profile = store.getProfile('v-mouse');
+      assert.equal(profile.pointer_type, 'fine');
+      assert.ok(Math.abs(profile.wheel_delta_y - 120) < 0.001);
+      assert.equal(profile.wheel_delta_mode, 0);
+      assert.equal(profile.smooth_scroll, 0);
+      assert.ok(Math.abs(profile.movement_min_step - 1) < 0.001);
+    });
+
+    it('stores smooth_scroll as 1 for true', () => {
+      store.saveProfile(makeProfileData({ visitor_id: 'v-smooth' }));
+
+      store.updateMouse('v-smooth', {
+        pointerType: 'fine',
+        smoothScroll: true,
+      });
+
+      const profile = store.getProfile('v-smooth');
+      assert.equal(profile.smooth_scroll, 1);
+    });
+
+    it('returns 0 changes for non-existent visitor_id', () => {
+      const result = store.updateMouse('non-existent', {
+        pointerType: 'fine',
+        wheelDeltaY: 120,
+      });
+      assert.equal(result.changes, 0);
+    });
+
+    it('handles null/missing mouse fields gracefully', () => {
+      store.saveProfile(makeProfileData({ visitor_id: 'v-null-mouse' }));
+
+      const result = store.updateMouse('v-null-mouse', {});
+      assert.ok(result.changes >= 0);
+
+      const profile = store.getProfile('v-null-mouse');
+      assert.equal(profile.pointer_type, null);
+      assert.equal(profile.wheel_delta_y, null);
+    });
+  });
+
   describe('maintenance', () => {
     it('getStats returns profile count', () => {
       store.saveProfile(makeProfileData({ visitor_id: 'v1' }));
