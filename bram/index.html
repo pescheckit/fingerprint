@@ -5,8 +5,54 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- CSP for Tor Browser compatibility -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';">
-  <title>DeviceCreep - Cross-Browser Device Detection</title>
+  <title>DeviceCreep - Advanced Cross-Browser Device Fingerprinting</title>
   <style>
+    :root {
+      --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --danger-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+
+      /* Light mode (default) */
+      --bg-dark: #f5f5f7;
+      --bg-light: #ffffff;
+      --bg-card: #ffffff;
+      --bg-header: rgba(255, 255, 255, 0.95);
+      --bg-module-header: rgba(102, 126, 234, 0.05);
+      --bg-module-header-hover: rgba(102, 126, 234, 0.1);
+      --bg-code: #f8f9fa;
+      --text-primary: #1d1d1f;
+      --text-secondary: #6e6e73;
+      --text-muted: #86868b;
+      --border-color: #d2d2d7;
+      --accent-purple: #667eea;
+      --accent-pink: #f5576c;
+      --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.15);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.1);
+      --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
+      --radial-gradient-1: radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.08) 0%, transparent 50%);
+      --radial-gradient-2: radial-gradient(circle at 80% 80%, rgba(245, 87, 108, 0.08) 0%, transparent 50%);
+    }
+
+    [data-theme="dark"] {
+      /* Dark mode */
+      --bg-dark: #0f0f23;
+      --bg-light: #1a1a2e;
+      --bg-card: #16213e;
+      --bg-header: rgba(15, 15, 35, 0.95);
+      --bg-module-header: rgba(102, 126, 234, 0.05);
+      --bg-module-header-hover: rgba(102, 126, 234, 0.1);
+      --bg-code: #0a0a1a;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0b8;
+      --text-muted: #6b6b85;
+      --border-color: #2a2a4a;
+      --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.3);
+      --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.2);
+      --radial-gradient-1: radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.1) 0%, transparent 50%);
+      --radial-gradient-2: radial-gradient(circle at 80% 80%, rgba(245, 87, 108, 0.1) 0%, transparent 50%);
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -14,273 +60,1063 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg-dark);
+      background-image: var(--radial-gradient-1), var(--radial-gradient-2);
       min-height: 100vh;
-      padding: 2rem;
-      color: #333;
+      color: var(--text-primary);
+      overflow-x: hidden;
+      transition: background-color 0.3s ease, color 0.3s ease;
     }
 
     .container {
       max-width: 1400px;
       margin: 0 auto;
-      background: white;
+      padding: 0;
+    }
+
+    /* Sticky Header */
+    .sticky-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg-header);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      box-shadow: var(--shadow-md);
+      animation: slideDown 0.5s ease-out;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+
+    @keyframes slideDown {
+      from {
+        transform: translateY(-100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .logo-section {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .logo {
+      font-size: 2rem;
+      background: var(--primary-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      background: rgba(102, 126, 234, 0.2);
+      border: 1px solid var(--accent-purple);
+      border-radius: 2rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent-purple);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    .quick-stats {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    .quick-stat {
+      text-align: center;
+    }
+
+    .quick-stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: var(--primary-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .quick-stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Main Content */
+    .main-content {
+      padding: 2rem;
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      padding: 3rem 2rem;
+      margin-bottom: 2rem;
+      animation: fadeIn 0.8s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .hero h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      background: var(--primary-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.2;
+    }
+
+    .hero .subtitle {
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+      max-width: 700px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* UUID Cards */
+    .uuid-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .uuid-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
       border-radius: 1rem;
       padding: 2rem;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+      animation: slideUp 0.6s ease-out;
     }
 
-    header {
-      text-align: center;
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .uuid-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--accent-purple);
+    }
+
+    .uuid-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--primary-gradient);
+    }
+
+    .uuid-card.fingerprint::before {
+      background: var(--danger-gradient);
+    }
+
+    .uuid-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+
+    .uuid-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .tooltip-icon {
+      width: 18px;
+      height: 18px;
+      background: rgba(102, 126, 234, 0.2);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      color: var(--accent-purple);
+      cursor: help;
+      position: relative;
+    }
+
+    .tooltip-icon:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      white-space: nowrap;
+      font-size: 0.75rem;
+      margin-bottom: 0.5rem;
+      z-index: 1000;
+      box-shadow: var(--shadow-md);
+    }
+
+    .uuid-value {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 1.5rem;
+      font-weight: 700;
+      word-break: break-all;
+      line-height: 1.4;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+    }
+
+    .uuid-meta {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .uuid-meta span {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .copy-btn {
+      width: 100%;
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: rgba(102, 126, 234, 0.1);
+      border: 1px solid var(--accent-purple);
+      color: var(--accent-purple);
+      border-radius: 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .copy-btn:hover {
+      background: var(--accent-purple);
+      color: white;
+      transform: scale(1.02);
+    }
+
+    .copy-btn:active {
+      transform: scale(0.98);
+    }
+
+    .copy-btn.copied {
+      background: #00f2a5;
+      border-color: #00f2a5;
+      color: var(--bg-dark);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
       margin-bottom: 2rem;
-      padding-bottom: 1.5rem;
-      border-bottom: 2px solid #f0f0f0;
     }
 
-    h1 {
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      text-align: center;
+      transition: all 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+      animation: fadeIn 0.8s ease-out;
+    }
+
+    .stat-card:hover {
+      border-color: var(--accent-purple);
+      box-shadow: var(--shadow-md);
+    }
+
+    .stat-icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      filter: grayscale(0.3);
+    }
+
+    .stat-value {
       font-size: 2.5rem;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-weight: 800;
+      background: var(--primary-gradient);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       margin-bottom: 0.5rem;
     }
 
-    .subtitle {
-      color: #666;
-      font-size: 1.1rem;
-    }
-
-    .device-id-card {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 2.5rem;
-      border-radius: 0.75rem;
-      margin: 2rem 0;
-      text-align: center;
-    }
-
-    .device-id-card h2 {
-      font-size: 1rem;
-      opacity: 0.9;
-      margin-bottom: 1rem;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-    }
-
-    .device-id {
-      font-family: 'Monaco', 'Courier New', monospace;
-      font-size: 2.5rem;
-      font-weight: bold;
-      word-break: break-all;
-      margin-bottom: 1rem;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1rem;
-      margin: 2rem 0;
-    }
-
-    .stat-card {
-      background: #f8f9fa;
-      padding: 2rem;
-      border-radius: 0.75rem;
-      text-align: center;
-      border-left: 4px solid #667eea;
-    }
-
-    .stat-value {
-      font-size: 2.5rem;
-      font-weight: bold;
-      color: #667eea;
-      margin-bottom: 0.5rem;
-    }
-
     .stat-label {
-      color: #666;
-      font-size: 1rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 2rem 0;
+    }
+
+    .btn {
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary {
+      background: var(--primary-gradient);
+      color: white;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-secondary {
+      background: rgba(102, 126, 234, 0.1);
+      border: 1px solid var(--accent-purple);
+      color: var(--accent-purple);
+    }
+
+    .btn-secondary:hover {
+      background: var(--accent-purple);
+      color: white;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    /* Search & Filter */
+    .search-section {
+      margin: 2rem 0;
+    }
+
+    .search-container {
+      position: relative;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 1rem 1rem 1rem 3rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      color: var(--text-primary);
+      font-size: 1rem;
+      transition: all 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 1.2rem;
+    }
+
+    /* Module Sections */
+    .module-section {
+      margin: 3rem 0;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color);
+      transition: border-color 0.3s ease;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .section-badge {
+      background: rgba(102, 126, 234, 0.2);
+      color: var(--accent-purple);
+      padding: 0.25rem 0.75rem;
+      border-radius: 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .section-description {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
     }
 
     .modules-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
       gap: 1.5rem;
-      margin: 2rem 0;
     }
 
+    /* Module Cards */
     .module-card {
-      background: #f8f9fa;
-      padding: 1.5rem;
-      border-radius: 0.75rem;
-      border-left: 4px solid #667eea;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      overflow: hidden;
+      transition: all 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+      animation: fadeIn 0.6s ease-out;
     }
 
-    .module-card h3 {
-      color: #667eea;
-      margin-bottom: 1rem;
+    .module-card:hover {
+      border-color: var(--accent-purple);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-3px);
+    }
+
+    .module-header {
+      padding: 1.25rem;
+      background: var(--bg-module-header);
+      border-bottom: 1px solid var(--border-color);
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+
+    .module-header:hover {
+      background: var(--bg-module-header-hover);
+    }
+
+    .module-title-section {
+      flex: 1;
+    }
+
+    .module-name {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .module-badges {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
     }
 
     .module-badge {
-      background: #667eea;
-      color: white;
       padding: 0.25rem 0.75rem;
       border-radius: 1rem;
       font-size: 0.75rem;
-      font-weight: normal;
+      font-weight: 600;
     }
 
-    .module-card pre {
-      background: white;
+    .badge-hardware {
+      background: rgba(0, 242, 165, 0.2);
+      color: #00f2a5;
+      border: 1px solid #00f2a5;
+    }
+
+    .badge-software {
+      background: rgba(160, 160, 184, 0.2);
+      color: var(--text-secondary);
+      border: 1px solid var(--text-muted);
+    }
+
+    .badge-tor-resistant {
+      background: rgba(102, 126, 234, 0.2);
+      color: var(--accent-purple);
+      border: 1px solid var(--accent-purple);
+    }
+
+    .module-stats {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    .module-stat {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .collapse-icon {
+      font-size: 1.5rem;
+      color: var(--text-muted);
+      transition: transform 0.3s ease;
+    }
+
+    .module-card.expanded .collapse-icon {
+      transform: rotate(180deg);
+    }
+
+    .module-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .module-card.expanded .module-content {
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    .module-data {
+      padding: 1.25rem;
+    }
+
+    .module-data pre {
+      background: var(--bg-code);
       padding: 1rem;
       border-radius: 0.5rem;
       overflow-x: auto;
       font-size: 0.85rem;
       line-height: 1.6;
-      max-height: 300px;
-      overflow-y: auto;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-color);
+      transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
     }
 
-    .controls {
-      display: flex;
-      gap: 1rem;
-      margin: 2rem 0;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    button {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      padding: 1rem 2rem;
-      border-radius: 0.5rem;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    }
-
-    button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(102, 126, 234, 0.6);
-    }
-
-    .loading {
+    /* Loading State */
+    .loading-container {
       text-align: center;
-      padding: 3rem;
+      padding: 4rem 2rem;
+      animation: fadeIn 0.5s ease-out;
     }
 
-    .spinner {
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #667eea;
+    .loading-spinner {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 2rem;
+      position: relative;
+    }
+
+    .spinner-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border: 4px solid transparent;
+      border-top-color: var(--accent-purple);
       border-radius: 50%;
-      width: 60px;
-      height: 60px;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 1rem;
+      animation: spin 1.2s linear infinite;
+    }
+
+    .spinner-ring:nth-child(2) {
+      border-top-color: var(--accent-pink);
+      animation-delay: -0.4s;
+    }
+
+    .spinner-ring:nth-child(3) {
+      border-top-color: #00f2a5;
+      animation-delay: -0.8s;
     }
 
     @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
     }
 
-    .alert {
-      background: #d4edda;
-      border: 1px solid #c3e6cb;
-      color: #155724;
-      padding: 1rem;
+    .loading-text {
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+    }
+
+    .loading-progress {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+
+    /* Progress Bar */
+    .progress-container {
+      max-width: 600px;
+      margin: 2rem auto 0;
+      background: var(--bg-card);
       border-radius: 0.5rem;
-      margin: 1rem 0;
+      overflow: hidden;
+      height: 8px;
+      transition: background-color 0.3s ease;
     }
 
-    .alert.info {
-      background: #d1ecf1;
-      border-color: #bee5eb;
-      color: #0c5460;
+    .progress-bar {
+      height: 100%;
+      background: var(--primary-gradient);
+      width: 0%;
+      transition: width 0.3s ease;
+      animation: shimmer 2s infinite;
+    }
+
+    @keyframes shimmer {
+      0% {
+        opacity: 0.6;
+      }
+      50% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0.6;
+      }
+    }
+
+    /* Tor Detection Alert */
+    .tor-alert {
+      background: linear-gradient(135deg, rgba(245, 87, 108, 0.2) 0%, rgba(240, 147, 251, 0.2) 100%);
+      border: 1px solid var(--accent-pink);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      margin: 2rem 0;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      animation: slideUp 0.6s ease-out;
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .tor-alert.detected {
+      border-color: #ff4757;
+      background: linear-gradient(135deg, rgba(255, 71, 87, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%);
+    }
+
+    .tor-icon {
+      font-size: 3rem;
+      flex-shrink: 0;
+    }
+
+    .tor-content h3 {
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    .tor-content p {
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .main-content {
+        padding: 1rem;
+      }
+
+      .hero h1 {
+        font-size: 2rem;
+      }
+
+      .hero .subtitle {
+        font-size: 1rem;
+      }
+
+      .uuid-section {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .quick-stats {
+        display: none;
+      }
+
+      .modules-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .controls {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-dark);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-purple);
+    }
+
+    /* Theme Toggle Button */
+    .theme-toggle {
+      position: fixed;
+      top: 1.5rem;
+      right: 2rem;
+      z-index: 1000;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 2px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.5rem;
+      transition: all 0.3s ease;
+      box-shadow: var(--shadow-md);
+      user-select: none;
+    }
+
+    .theme-toggle:hover {
+      transform: scale(1.1) rotate(20deg);
+      border-color: var(--accent-purple);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .theme-toggle:active {
+      transform: scale(0.95) rotate(20deg);
+    }
+
+    .theme-icon {
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      position: absolute;
+    }
+
+    .theme-icon.sun {
+      opacity: 1;
+      transform: rotate(0deg) scale(1);
+    }
+
+    .theme-icon.moon {
+      opacity: 0;
+      transform: rotate(180deg) scale(0);
+    }
+
+    [data-theme="dark"] .theme-icon.sun {
+      opacity: 0;
+      transform: rotate(-180deg) scale(0);
+    }
+
+    [data-theme="dark"] .theme-icon.moon {
+      opacity: 1;
+      transform: rotate(0deg) scale(1);
+    }
+
+    /* Utility Classes */
+    .hidden {
+      display: none !important;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .mt-2 {
+      margin-top: 2rem;
+    }
+
+    .mb-2 {
+      margin-bottom: 2rem;
     }
   </style>
 </head>
 <body>
+  <!-- Theme Toggle Button -->
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+    <span class="theme-icon sun">☀️</span>
+    <span class="theme-icon moon">🌙</span>
+  </button>
+
   <div class="container">
-    <header>
-      <h1>👁️ DeviceCreep</h1>
-      <p class="subtitle">Cross-Browser Device Detection using Hardware Fingerprinting</p>
-    </header>
-
-    <div class="alert info">
-      <strong>ℹ️ Cross-Browser Detection:</strong> This tool identifies your DEVICE (not just browser) using hardware-level signals that remain consistent across Chrome, Firefox, Safari, and Edge.
+    <!-- Sticky Header -->
+    <div class="sticky-header" id="stickyHeader" style="display: none;">
+      <div class="header-content">
+        <div class="logo-section">
+          <div class="logo">DeviceCreep</div>
+          <div class="status-badge" id="headerStatus">Ready</div>
+        </div>
+        <div class="quick-stats" id="quickStats">
+          <div class="quick-stat">
+            <div class="quick-stat-value" id="headerEntropy">0</div>
+            <div class="quick-stat-label">Bits</div>
+          </div>
+          <div class="quick-stat">
+            <div class="quick-stat-value" id="headerStability">0%</div>
+            <div class="quick-stat-label">Stability</div>
+          </div>
+          <div class="quick-stat">
+            <div class="quick-stat-value" id="headerModules">0</div>
+            <div class="quick-stat-label">Modules</div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div id="loading" class="loading">
-      <div class="spinner"></div>
-      <p style="color: #666; font-size: 1.1rem;">Analyzing hardware signals...</p>
-    </div>
-
-    <div id="result" style="display: none;">
-      <div class="device-id-card">
-        <h2>🖥️ Device UUID (Cross-Browser)</h2>
-        <div class="device-id" id="deviceId" style="font-size: 2rem;"></div>
-        <p style="opacity: 0.8; font-size: 0.85rem; margin-top: 0.5rem;">
-          Same across Chrome, Firefox, Safari, Edge, and Tor
+    <div class="main-content">
+      <!-- Hero Section -->
+      <div class="hero">
+        <h1>DeviceCreep</h1>
+        <p class="subtitle">
+          Advanced cross-browser device fingerprinting using hardware-level signals.
+          Track devices consistently across Chrome, Firefox, Safari, Edge, and even Tor Browser.
         </p>
       </div>
 
-      <div class="device-id-card" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); margin-top: 1rem;">
-        <h2>🔍 Fingerprint UUID (Deep)</h2>
-        <div class="device-id" id="fingerprintId" style="font-size: 1.5rem;"></div>
-        <p style="opacity: 0.8; font-size: 0.85rem; margin-top: 0.5rem;" id="confidence"></p>
-      </div>
-
-      <div class="stats">
-        <div class="stat-card">
-          <div class="stat-value" id="entropy">0</div>
-          <div class="stat-label">Bits of Entropy</div>
+      <!-- Loading State -->
+      <div id="loading" class="loading-container">
+        <div class="loading-spinner">
+          <div class="spinner-ring"></div>
+          <div class="spinner-ring"></div>
+          <div class="spinner-ring"></div>
         </div>
-        <div class="stat-card">
-          <div class="stat-value" id="stability">0%</div>
-          <div class="stat-label">Cross-Browser Stability</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="modules">0</div>
-          <div class="stat-label">Hardware Modules</div>
+        <div class="loading-text">Analyzing Hardware Signals</div>
+        <div class="loading-progress" id="loadingProgress">Initializing modules...</div>
+        <div class="progress-container">
+          <div class="progress-bar" id="progressBar"></div>
         </div>
       </div>
 
-      <div class="controls">
-        <button id="btnRegenerate">🔄 Regenerate</button>
-        <button id="btnCopy">📋 Copy Device ID</button>
-        <button id="btnExport">💾 Export Results (JSON)</button>
+      <!-- Results Section -->
+      <div id="result" class="hidden">
+        <!-- UUID Cards -->
+        <div class="uuid-section">
+          <div class="uuid-card device">
+            <div class="uuid-header">
+              <div class="uuid-title">Device UUID - Cross-Browser</div>
+              <div class="tooltip-icon" data-tooltip="Same across all browsers on this device">?</div>
+            </div>
+            <div class="uuid-value" id="deviceId">-</div>
+            <div class="uuid-meta">
+              <span>Tor-Resistant</span>
+              <span>Hardware-Based</span>
+              <span id="deviceEntropyBadge">0 bits</span>
+            </div>
+            <button class="copy-btn" id="btnCopyDevice">Copy Device UUID</button>
+          </div>
+
+          <div class="uuid-card fingerprint">
+            <div class="uuid-header">
+              <div class="uuid-title">Fingerprint UUID - Deep Analysis</div>
+              <div class="tooltip-icon" data-tooltip="High-entropy fingerprint, may vary by browser">?</div>
+            </div>
+            <div class="uuid-value" id="fingerprintId" style="font-size: 1.3rem;">-</div>
+            <div class="uuid-meta">
+              <span>Browser-Specific</span>
+              <span id="confidenceBadge">0% confidence</span>
+              <span id="fingerprintEntropyBadge">0 bits</span>
+            </div>
+            <button class="copy-btn" id="btnCopyFingerprint">Copy Fingerprint UUID</button>
+          </div>
+        </div>
+
+        <!-- Tor Detection Alert -->
+        <div id="torAlert" class="tor-alert hidden">
+          <div class="tor-icon">🧅</div>
+          <div class="tor-content">
+            <h3 id="torAlertTitle">Tor Browser Detected</h3>
+            <p id="torAlertMessage">This browser has characteristics consistent with Tor Browser. Device UUID remains stable.</p>
+          </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">🔐</div>
+            <div class="stat-value" id="entropy">0</div>
+            <div class="stat-label">Total Entropy (bits)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🎯</div>
+            <div class="stat-value" id="stability">0%</div>
+            <div class="stat-label">Cross-Browser Stability</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">⚙️</div>
+            <div class="stat-value" id="modules">0</div>
+            <div class="stat-label">Active Modules</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🔧</div>
+            <div class="stat-value" id="hardwareModules">0</div>
+            <div class="stat-label">Hardware Modules</div>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+          <button class="btn btn-primary" id="btnRegenerate">
+            <span>🔄</span>
+            <span>Regenerate</span>
+          </button>
+          <button class="btn btn-secondary" id="btnExport">
+            <span>💾</span>
+            <span>Export JSON</span>
+          </button>
+        </div>
+
+        <!-- Search & Filter -->
+        <div class="search-section">
+          <div class="search-container">
+            <div class="search-icon">🔍</div>
+            <input
+              type="text"
+              id="moduleSearch"
+              class="search-input"
+              placeholder="Search modules (e.g., webgl, audio, canvas)..."
+            />
+          </div>
+        </div>
+
+        <!-- Device UUID Modules Section -->
+        <div class="module-section" id="deviceModulesSection">
+          <div class="section-header">
+            <div class="section-title">
+              <span>🖥️</span>
+              <span>Device UUID Modules</span>
+              <span class="section-badge" id="deviceModuleCount">0</span>
+            </div>
+          </div>
+          <div class="section-description">
+            Cross-browser compatible modules that work identically across Chrome, Firefox, Safari, Edge, and Tor Browser.
+            These modules are resistant to browser fingerprinting protections.
+          </div>
+          <div class="modules-grid" id="deviceModulesGrid"></div>
+        </div>
+
+        <!-- Fingerprint UUID Modules Section -->
+        <div class="module-section" id="fingerprintModulesSection">
+          <div class="section-header">
+            <div class="section-title">
+              <span>🔍</span>
+              <span>Fingerprint UUID Modules</span>
+              <span class="section-badge" id="fingerprintModuleCount">0</span>
+            </div>
+          </div>
+          <div class="section-description">
+            High-entropy modules that provide deep fingerprinting capabilities.
+            These may vary across browsers but offer maximum uniqueness.
+          </div>
+          <div class="modules-grid" id="fingerprintModulesGrid"></div>
+        </div>
+
+        <!-- Detection Modules Section -->
+        <div class="module-section" id="detectionModulesSection">
+          <div class="section-header">
+            <div class="section-title">
+              <span>🔬</span>
+              <span>Detection Modules</span>
+              <span class="section-badge" id="detectionModuleCount">0</span>
+            </div>
+          </div>
+          <div class="section-description">
+            Environment detection modules that identify browser characteristics, privacy tools, and anonymization attempts.
+          </div>
+          <div class="modules-grid" id="detectionModulesGrid"></div>
+        </div>
       </div>
-
-      <div style="margin: 2rem 0;">
-        <input
-          type="text"
-          id="moduleSearch"
-          placeholder="🔍 Search modules... (e.g., 'webgl', 'audio', 'tor')"
-          style="width: 100%; padding: 1rem; border: 2px solid #e0e0e0; border-radius: 0.5rem; font-size: 1rem;"
-        />
-      </div>
-
-      <h2 style="margin: 2rem 0 1rem 0; color: #333;">🖥️ Device UUID Modules (Cross-Browser, Tor-Resistant)</h2>
-      <p style="color: #666; margin-bottom: 1rem;">These modules work identically across Chrome, Firefox, Safari, Edge, and Tor</p>
-      <div class="modules-grid" id="deviceModulesGrid"></div>
-
-      <h2 style="margin: 3rem 0 1rem 0; color: #333;">🔍 Fingerprint UUID Modules (Deep, Browser-Specific)</h2>
-      <p style="color: #666; margin-bottom: 1rem;">These modules provide high entropy but may vary across browsers</p>
-      <div class="modules-grid" id="fingerprintModulesGrid"></div>
-
-      <h2 style="margin: 3rem 0 1rem 0; color: #333;">🔬 Detection Modules</h2>
-      <div class="modules-grid" id="detectionModulesGrid"></div>
     </div>
   </div>
 
