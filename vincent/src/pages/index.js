@@ -1,0 +1,7 @@
+export { OverviewTab } from './OverviewTab'
+export { SignalsTab } from './SignalsTab'
+export { StabilityTab } from './StabilityTab'
+export { ChangesTab } from './ChangesTab'
+export { PagesTab } from './PagesTab'
+export { GlobalStatsTab } from './GlobalStatsTab'
+export { FingerprintJSTab } from './FingerprintJSTab'
