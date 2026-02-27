@@ -46,6 +46,36 @@ function App() {
     return localStorage.getItem('fingerprint-user-name') || ''
   })
   const [namePromptDismissed, setNamePromptDismissed] = useState(false)
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('fingerprint-theme') || 'system'
+  })
+
+  // Apply theme to document
+  useEffect(() => {
+    const root = document.documentElement
+    root.setAttribute('data-theme', theme)
+    localStorage.setItem('fingerprint-theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme((prev) => {
+      if (prev === 'system') return 'light'
+      if (prev === 'light') return 'dark'
+      return 'system'
+    })
+  }
+
+  const getThemeIcon = () => {
+    if (theme === 'light') return '☀️'
+    if (theme === 'dark') return '🌙'
+    return '💻'
+  }
+
+  const getThemeLabel = () => {
+    if (theme === 'light') return 'Light'
+    if (theme === 'dark') return 'Dark'
+    return 'System'
+  }
 
   const showNamePrompt = !historyLoading && !fpLoading && !userName && !isReturningVisitor && !namePromptDismissed
 
@@ -82,8 +112,14 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Browser Fingerprint</h1>
-        <p className="subtitle">by Vincent</p>
+        <div className="header-content">
+          <h1>Browser Fingerprint</h1>
+          <p className="subtitle">by Vincent</p>
+        </div>
+        <button className="theme-toggle" onClick={toggleTheme} title={`Theme: ${getThemeLabel()}`}>
+          <span className="theme-icon">{getThemeIcon()}</span>
+          <span className="theme-label">{getThemeLabel()}</span>
+        </button>
       </header>
 
       <main className="main">
