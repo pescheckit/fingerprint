@@ -101,7 +101,7 @@ function App() {
     );
   }
 
-  const { fingerprintId, stableFingerprint, thumbmarkId, thumbmarkComponents, categoryFingerprints, scanList, collectionTimeMs, signals, general, collectedAt } = result;
+  const { fingerprintId, stableFingerprint, thumbmarkId, thumbmarkComponents, categoryFingerprints, scanList, collectionTimeMs, signals, general, privacyCheck, collectedAt } = result;
 
   const signalCards = [
     { title: 'Canvas', icon: '🎨', entropy: 'high', data: { ...signals.canvas, dataURL: signals.canvas.dataURL ? `[${signals.canvas.length} chars]` : null } },
@@ -227,6 +227,43 @@ function App() {
             {general.location && (
               <InfoItem icon="📍" label="Coordinates" value={`${general.location.latitude}, ${general.location.longitude}`} />
             )}
+          </div>
+        </div>
+      </div>
+
+      <div className="privacy-card">
+        <div className="privacy-header">
+          <span className={`privacy-verdict verdict-${privacyCheck.verdict}`}>
+            {privacyCheck.verdict === 'tor' && '🧅 Tor Detected'}
+            {privacyCheck.verdict === 'vpn' && '🛡️ VPN / Proxy Detected'}
+            {privacyCheck.verdict === 'suspicious' && '⚠️ Suspicious'}
+            {privacyCheck.verdict === 'clean' && '✅ No VPN/Proxy Detected'}
+          </span>
+          <span className="privacy-scores">
+            Tor: {privacyCheck.tor.score}/{privacyCheck.tor.total} &middot; VPN: {privacyCheck.vpn.score}/{privacyCheck.vpn.total}
+          </span>
+        </div>
+
+        <div className="privacy-signals">
+          <div className="privacy-col">
+            <div className="privacy-col-title">Tor Signals</div>
+            {privacyCheck.tor.signals.map((s) => (
+              <div key={s.name} className={`privacy-signal ${s.detected ? 'signal-detected' : 'signal-clear'}`}>
+                <span className="signal-dot">{s.detected ? '🔴' : '🟢'}</span>
+                <span className="signal-name">{s.name}</span>
+                <span className={`signal-weight weight-${s.weight}`}>{s.weight}</span>
+              </div>
+            ))}
+          </div>
+          <div className="privacy-col">
+            <div className="privacy-col-title">VPN Signals</div>
+            {privacyCheck.vpn.signals.map((s) => (
+              <div key={s.name} className={`privacy-signal ${s.detected ? 'signal-detected' : 'signal-clear'}`}>
+                <span className="signal-dot">{s.detected ? '🔴' : '🟢'}</span>
+                <span className="signal-name">{s.name}</span>
+                <span className={`signal-weight weight-${s.weight}`}>{s.weight}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

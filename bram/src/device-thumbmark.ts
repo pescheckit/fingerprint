@@ -10,24 +10,33 @@ import {
 } from './types';
 import { hashObject, hashObjectSync } from './utils/hash';
 import { safely, calculateTotalEntropy, calculateAverageStability, calculateConfidence } from './utils/helpers';
+// Device UUID modules (Tor-resistant, cross-browser)
+import {
+  FloatingPointModule,
+  WebGLCapabilitiesModule,
+  PerformanceRatioModule,
+  ScreenAspectModule,
+  HardwareModule,
+  CanvasPropertiesModule,
+  TouchCapabilitiesModule,
+  ColorDepthModule
+} from './modules/device';
+
+// Fingerprint UUID modules (browser-specific, deep)
 import {
   WebGLModule,
   WebGLRenderModule,
-  WebGLCapabilitiesModule,
   CanvasModule,
-  CanvasPropertiesModule,
   AudioModule,
   ScreenModule,
-  ScreenAspectModule,
-  HardwareModule,
-  SystemModule,
   PerformanceModule,
-  PerformanceRatioModule,
-  TorDetectionModule,
-  FloatingPointModule,
-  TouchCapabilitiesModule,
-  ColorDepthModule
-} from './modules';
+  SystemModule
+} from './modules/fingerprint';
+
+// Detection modules
+import {
+  TorDetectionModule
+} from './modules/detection';
 
 export class DeviceThumbmark {
   private options: DeviceThumbmarkOptions;
@@ -74,14 +83,15 @@ export class DeviceThumbmark {
   enableProtocols() {
     this.enableProtocolDetection = true;
 
-    // Add ProtocolsModule if not already present
-    const hasProtocols = this.allModules.some(m => m.name === 'protocols');
-    if (!hasProtocols) {
-      this.allModules.push(new ProtocolsModule());
-    }
+    // NOTE: ProtocolsModule has been removed as it's unreliable/blocked on Tor
+    // If you need protocol detection, implement it separately
+    // const hasProtocols = this.allModules.some(m => m.name === 'protocols');
+    // if (!hasProtocols) {
+    //   this.allModules.push(new ProtocolsModule());
+    // }
 
     if (this.options.debug) {
-      console.log('⚠️  Protocol detection enabled - may trigger system dialogs');
+      console.log('⚠️  Protocol detection is no longer supported - module removed');
     }
   }
 
@@ -186,45 +196,57 @@ export class DeviceThumbmark {
     ];
     // TOTAL: ~27 bits that work on ALL browsers including Tor!
 
-    const hardwareModules = modules.filter(m => {
-      // ALWAYS use only cross-browser stable signals
-      // This ensures SAME device = SAME ID across Firefox/Chrome/Tor/Safari
-      // Trade-off: ~22 bits (consistent) vs ~60 bits (inconsistent)
+    // DUAL UUID SYSTEM
+
+    // 1. Device UUID (Tor-resistant, cross-browser)
+    const deviceModules = modules.filter(m => {
       return CROSS_BROWSER_MODULES.includes(m.name) && m.data !== null;
     });
 
-    const hardwareData: any = {};
-    for (const module of hardwareModules) {
-      hardwareData[module.name] = module.data;
+    const deviceData: any = {};
+    for (const module of deviceModules) {
+      deviceData[module.name] = module.data;
     }
 
-    const deviceId = await hashObject(hardwareData); // SHA-256 for better uniqueness
+    const deviceId = await hashObject(deviceData); // Cross-browser device ID
+    const deviceEntropy = calculateTotalEntropy(deviceModules);
+
+    // 2. Fingerprint UUID (deep, all signals)
+    const allHardwareModules = modules.filter(m => m.hardwareBased && m.data !== null);
+    const fingerprintData: any = {};
+    for (const module of allHardwareModules) {
+      fingerprintData[module.name] = module.data;
+    }
+
+    const fingerprintId = await hashObject(fingerprintData); // Deep fingerprint ID
+    const fingerprintEntropy = calculateTotalEntropy(allHardwareModules);
 
     if (this.options.debug) {
-      console.log(`🌐 Cross-Browser Mode: Using ${hardwareModules.length} stable modules`);
-      console.log(`   Modules for Device ID: ${hardwareModules.map(m => m.name).join(', ')}`);
+      console.log(`\n🎯 DUAL UUID SYSTEM:`);
+      console.log(`   Device UUID: ${deviceId} (${deviceEntropy.toFixed(1)} bits, ${deviceModules.length} modules)`);
+      console.log(`   Fingerprint UUID: ${fingerprintId} (${fingerprintEntropy.toFixed(1)} bits, ${allHardwareModules.length} modules)`);
       console.log(`   ${isTor ? '🧅 Tor detected!' : '✓ Normal browser'}`);
     }
 
     const collectTime = performance.now() - startTime;
 
     if (this.options.debug) {
-      console.log(`\n📊 Device Thumbmark Generated in ${collectTime.toFixed(2)}ms`);
-      console.log(`   Device ID: ${deviceId}`);
-      console.log(`   Entropy: ${entropy.toFixed(1)} bits`);
-      console.log(`   Stability: ${stability}%`);
-      console.log(`   Confidence: ${confidence}%`);
-      console.log(`   Modules: ${modules.length}/${this.allModules.length}`);
+      console.log(`\n📊 Generated in ${collectTime.toFixed(2)}ms`);
+      console.log(`   Total Modules: ${modules.length}/${this.allModules.length}`);
     }
 
     return {
-      deviceId,
+      deviceId,           // Cross-browser UUID (27 bits, Tor-resistant)
+      fingerprintId,      // Deep fingerprint UUID (70+ bits, browser-specific)
       confidence,
       entropy,
+      deviceEntropy,      // Entropy of device UUID
+      fingerprintEntropy, // Entropy of fingerprint UUID
       stability,
       modules,
       timestamp: Date.now(),
-      userAgent: navigator.userAgent
+      userAgent: navigator.userAgent,
+      isTor
     };
   }
 
