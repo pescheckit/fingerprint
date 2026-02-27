@@ -12,5 +12,6 @@
 
 export { TorDetectionModule } from './tor-detection';
 export { VPNDetectorModule } from './vpn-detector';
+export { ProxyDetectorModule } from './proxy-detector';
 // Server-side module excluded from browser build (uses Node.js APIs)
 // export { ServerTorDetectionModule, createTorDetectionMiddleware } from './tor-detection-server';

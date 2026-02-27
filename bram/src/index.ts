@@ -46,5 +46,6 @@ export {
 
   // Detection modules
   TorDetectionModule,
-  VPNDetectorModule
+  VPNDetectorModule,
+  ProxyDetectorModule
 } from './modules';

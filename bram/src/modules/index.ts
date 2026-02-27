@@ -54,7 +54,8 @@ export {
 // Detection modules
 export {
   TorDetectionModule,
-  VPNDetectorModule
+  VPNDetectorModule,
+  ProxyDetectorModule
 } from './detection';
 
 // Note: Server-side modules (tor-detection-server) are excluded from browser build

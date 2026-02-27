@@ -47,7 +47,8 @@ import {
 // Detection modules
 import {
   TorDetectionModule,
-  VPNDetectorModule
+  VPNDetectorModule,
+  ProxyDetectorModule
 } from './modules/detection';
 
 export class DeviceThumbmark {
@@ -77,6 +78,7 @@ export class DeviceThumbmark {
       // TIER 2: BROWSER-SPECIFIC (extra entropy on normal browsers)
       new TorDetectionModule(),       // Tor detection - 8 bits, 90%
       new VPNDetectorModule(),        // VPN detection - 0 bits (detection only) 🆕
+      new ProxyDetectorModule(),      // Proxy detection - 0 bits (detection only) 🆕
       new WebRTCLeakModule(),         // IP leak - 10 bits, 85% (proxy-resistant!) 🆕
       new NetworkTimingModule(),      // Network timing - 8 bits, 75% (proxy-resistant!) 🆕
       new FontsModule(),              // Fonts - 7 bits, 92% (educational!) 🆕
@@ -240,10 +242,15 @@ export class DeviceThumbmark {
     // MORE modules than Device UUID, but ONLY cross-browser stable
     const FINGERPRINT_STABLE_MODULES = [
       ...CROSS_BROWSER_MODULES,  // All 8 Device UUID modules
-      'webgl', 'audio', 'screen', 'performance', 'system',
+      // Add more stable modules (NO browser-specific strings!):
+      'audio', 'screen', 'performance', 'system',
       'webrtc-leak', 'network-timing', 'fonts', 'speech-synthesis',
       'webgpu', 'webassembly-cpu', 'gamepad'
-      // EXCLUDED: extensions, canvas, webgl-render (browser-specific variance)
+      // EXCLUDED for cross-browser stability:
+      // - webgl (renderer strings differ per browser!)
+      // - extensions (browser-specific!)
+      // - canvas (rendering engine differences!)
+      // - webgl-render (pixel differences!)
     ];
 
     const fingerprintModules = modules.filter(m =>

@@ -186,13 +186,14 @@ async function displayResult() {
     animateCounter('headerStability', currentResult.stability, 0);
     animateCounter('headerModules', currentResult.modules.length, 0);
 
-    console.log('✅ About to display Tor/VPN detection...');
+    console.log('✅ About to display Tor/VPN/Proxy detection...');
 
-    // Check for Tor and VPN detection
+    // Check for Tor, VPN, and Proxy detection
     try {
       displayTorDetection(currentResult);
       displayVPNDetection(currentResult);
-      console.log('✅ Tor/VPN detection displayed');
+      displayProxyDetection(currentResult);
+      console.log('✅ Tor/VPN/Proxy detection displayed');
     } catch (e) {
       console.error('❌ Error in detection display:', e);
     }
@@ -346,18 +347,88 @@ function displayTorDetection(result: DeviceThumbmarkResult) {
  * Display VPN detection alert
  */
 function displayVPNDetection(result: DeviceThumbmarkResult) {
+  const vpnAlert = document.getElementById('vpnAlert');
+  if (!vpnAlert) {
+    console.warn('⚠️  VPN alert element not found in DOM');
+    return;
+  }
+
   // Find VPN detection module
   const vpnModule = result.modules.find(m => m.name === 'vpn-detector');
-  if (!vpnModule) return;
+  if (!vpnModule) {
+    console.warn('⚠️  VPN module not found in results');
+    return;
+  }
 
   const vpnData = vpnModule.data as any;
 
+  console.log('🔍 VPN Detection Data:', vpnData);
+
   // Only show alert if VPN is detected with reasonable confidence
   if (vpnData.isVPN && vpnData.probability > 50) {
-    console.log(`🔒 VPN/Proxy Detected: ${vpnData.probability}% probability (${vpnData.methods.join(', ')})`);
+    console.log(`🔒 VPN Detected: ${vpnData.probability}% probability (${vpnData.methods.join(', ')})`);
 
-    // Could add a UI alert similar to Tor detection if needed
-    // For now, just log to console for educational purposes
+    vpnAlert.classList.remove('hidden');
+    vpnAlert.classList.add('detected');
+
+    const title = document.getElementById('vpnAlertTitle');
+    const message = document.getElementById('vpnAlertMessage');
+
+    if (title) {
+      title.textContent = '🔒 VPN Detected';
+    }
+
+    if (message) {
+      const methods = vpnData.methods || [];
+      const methodsText = methods.length > 0 ? methods.join(', ') : 'network analysis';
+      message.textContent = `Detected via: ${methodsText}. Confidence: ${vpnData.confidence}. Probability: ${vpnData.probability}%.`;
+    }
+  } else {
+    console.log(`✅ No VPN detected (probability: ${vpnData.probability}%)`);
+  }
+}
+
+/**
+ * Display Proxy detection alert
+ */
+function displayProxyDetection(result: DeviceThumbmarkResult) {
+  const proxyAlert = document.getElementById('proxyAlert');
+  if (!proxyAlert) {
+    console.warn('⚠️  Proxy alert element not found in DOM');
+    return;
+  }
+
+  // Find Proxy detection module
+  const proxyModule = result.modules.find(m => m.name === 'proxy-detector');
+  if (!proxyModule) {
+    console.warn('⚠️  Proxy module not found in results');
+    return;
+  }
+
+  const proxyData = proxyModule.data as any;
+
+  console.log('🔍 Proxy Detection Data:', proxyData);
+
+  // Only show alert if Proxy is detected with reasonable confidence
+  if (proxyData.isProxy && proxyData.probability > 50) {
+    console.log(`🌐 Proxy Detected: ${proxyData.probability}% probability (${proxyData.methods.join(', ')})`);
+
+    proxyAlert.classList.remove('hidden');
+    proxyAlert.classList.add('detected');
+
+    const title = document.getElementById('proxyAlertTitle');
+    const message = document.getElementById('proxyAlertMessage');
+
+    if (title) {
+      title.textContent = '🌐 Proxy Detected';
+    }
+
+    if (message) {
+      const explanation = proxyData.explanation || 'Network timing patterns indicate proxy usage.';
+      message.textContent = `${explanation} Detection methods: ${proxyData.methods.join(', ')}.`;
+    }
+  } else {
+    console.log(`✅ No Proxy detected (probability: ${proxyData.probability}%)`);
   }
 }
 
@@ -375,7 +446,7 @@ async function displayModulesByCategory(result: DeviceThumbmarkResult) {
   ];
 
   // Detection modules
-  const DETECTION_MODULES = ['tor-detection', 'vpn-detector'];
+  const DETECTION_MODULES = ['tor-detection', 'vpn-detector', 'proxy-detector'];
 
   // Separate modules by category
   const deviceModules = result.modules.filter(m => DEVICE_MODULES.includes(m.name));

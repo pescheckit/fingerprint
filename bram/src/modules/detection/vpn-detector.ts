@@ -25,6 +25,8 @@ export class VPNDetectorModule implements ModuleInterface {
   }
 
   async collect(): Promise<any> {
+    console.log('🔍 VPN Detector: Starting analysis...');
+
     const signals: any = {};
 
     // 1. Check for WebRTC IP leaks
@@ -38,14 +40,31 @@ export class VPNDetectorModule implements ModuleInterface {
 
     // Calculate VPN probability
     const probability = this.calculateVPNProbability(signals);
+    const detectionMethods = this.getDetectionMethods(signals);
+
+    console.log(`🔍 VPN Detector: ${probability}% probability (${detectionMethods.join(', ')})`);
 
     return {
       isVPN: probability > 50,
       probability,
       confidence: this.getConfidence(signals),
       signals,
-      methods: this.getDetectionMethods(signals)
+      methods: detectionMethods,
+      explanation: this.getExplanation(signals, probability)
     };
+  }
+
+  /**
+   * Generate human-readable explanation
+   */
+  private getExplanation(signals: any, probability: number): string {
+    if (probability < 30) {
+      return 'No VPN indicators detected. Connection appears direct.';
+    } else if (probability < 70) {
+      return 'Some VPN indicators present. May be using VPN or experiencing network issues.';
+    } else {
+      return 'Strong VPN indicators detected. Connection shows characteristics of VPN usage.';
+    }
   }
 
   private async checkWebRTC(): Promise<any> {
