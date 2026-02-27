@@ -1,3 +1,42 @@
+// === THEME SYSTEM ===
+
+const THEMES = [
+  { value: '', label: 'Win98' },
+  { value: 'crt', label: 'CRT Terminal' },
+  { value: 'cyber', label: 'Cyberpunk' },
+  { value: 'brutalist', label: 'Brutalist' },
+  { value: 'hud', label: 'Sci-Fi HUD' },
+  { value: 'vapor', label: 'Vaporwave' },
+];
+
+const THEME_STORAGE_KEY = 'dennie_theme';
+
+function applyTheme(theme) {
+  if (theme) {
+    document.body.dataset.theme = theme;
+  } else {
+    delete document.body.dataset.theme;
+  }
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme || '');
+  } catch {}
+}
+
+function getSavedTheme() {
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function initThemeUI() {
+  const select = document.getElementById('theme-select');
+  if (!select) return;
+  select.value = getSavedTheme();
+  select.addEventListener('change', () => applyTheme(select.value));
+}
+
 // === COLLECTORS ===
 
 function getCanvasFingerprint() {
@@ -1025,6 +1064,11 @@ function findChanges(prev, curr, path = '') {
 // === MAIN ===
 
 async function main() {
+  // Apply saved theme + wire up the header select
+  const savedTheme = getSavedTheme();
+  if (savedTheme) applyTheme(savedTheme);
+  initThemeUI();
+
   const signals = await collectAll();
   const [hardwareHash, browserHash] = await Promise.all([
     generateHardwareHash(signals),
