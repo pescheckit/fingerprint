@@ -37,12 +37,24 @@ export {
   AudioModule,
   ScreenModule,
   PerformanceModule,
-  SystemModule
+  SystemModule,
+  WebRTCLeakModule,
+  NetworkTimingModule,
+  FontsModule,
+  SpeechSynthesisModule,
+  WebGPUModule,
+  ExtensionsModule,
+  OffscreenCanvasModule,
+  KeystrokeDynamicsModule,
+  MouseDynamicsModule,
+  WebAssemblyCPUModule,
+  GamepadModule
 } from './fingerprint';
 
 // Detection modules
 export {
-  TorDetectionModule
+  TorDetectionModule,
+  VPNDetectorModule
 } from './detection';
 
 // Note: Server-side modules (tor-detection-server) are excluded from browser build

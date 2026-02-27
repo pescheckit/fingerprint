@@ -32,7 +32,19 @@ export {
   ScreenModule,
   PerformanceModule,
   SystemModule,
+  WebRTCLeakModule,
+  NetworkTimingModule,
+  FontsModule,
+  SpeechSynthesisModule,
+  WebGPUModule,
+  ExtensionsModule,
+  OffscreenCanvasModule,
+  KeystrokeDynamicsModule,
+  MouseDynamicsModule,
+  WebAssemblyCPUModule,
+  GamepadModule,
 
   // Detection modules
-  TorDetectionModule
+  TorDetectionModule,
+  VPNDetectorModule
 } from './modules';

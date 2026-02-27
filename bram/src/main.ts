@@ -146,8 +146,20 @@ async function displayResult() {
     await new Promise(resolve => setTimeout(resolve, 300));
 
     // Hide loading, show result with fade
-    loadingEl.classList.add('hidden');
-    resultEl.classList.remove('hidden');
+    console.log('🎬 Hiding loading, showing result...');
+    console.log('   loadingEl exists:', !!loadingEl);
+    console.log('   resultEl exists:', !!resultEl);
+
+    if (loadingEl) {
+      loadingEl.classList.add('hidden');
+      console.log('   ✅ Loading hidden');
+    }
+
+    if (resultEl) {
+      resultEl.classList.remove('hidden');
+      console.log('   ✅ Result visible, has hidden class:', resultEl.classList.contains('hidden'));
+    }
+
     if (stickyHeader) {
       stickyHeader.style.display = 'block';
     }
@@ -174,12 +186,25 @@ async function displayResult() {
     animateCounter('headerStability', currentResult.stability, 0);
     animateCounter('headerModules', currentResult.modules.length, 0);
 
+    console.log('✅ About to display Tor/VPN detection...');
+
     // Check for Tor and VPN detection
-    displayTorDetection(currentResult);
-    displayVPNDetection(currentResult);
+    try {
+      displayTorDetection(currentResult);
+      displayVPNDetection(currentResult);
+      console.log('✅ Tor/VPN detection displayed');
+    } catch (e) {
+      console.error('❌ Error in detection display:', e);
+    }
 
     // Display modules by category
-    await displayModulesByCategory(currentResult);
+    console.log('✅ About to display modules by category...');
+    try {
+      await displayModulesByCategory(currentResult);
+      console.log('✅ Modules displayed successfully');
+    } catch (e) {
+      console.error('❌ Error displaying modules:', e);
+    }
 
   } catch (error) {
     stopProgress();
@@ -318,9 +343,31 @@ function displayTorDetection(result: DeviceThumbmarkResult) {
 }
 
 /**
+ * Display VPN detection alert
+ */
+function displayVPNDetection(result: DeviceThumbmarkResult) {
+  // Find VPN detection module
+  const vpnModule = result.modules.find(m => m.name === 'vpn-detector');
+  if (!vpnModule) return;
+
+  const vpnData = vpnModule.data as any;
+
+  // Only show alert if VPN is detected with reasonable confidence
+  if (vpnData.isVPN && vpnData.probability > 50) {
+    console.log(`🔒 VPN/Proxy Detected: ${vpnData.probability}% probability (${vpnData.methods.join(', ')})`);
+
+    // Could add a UI alert similar to Tor detection if needed
+    // For now, just log to console for educational purposes
+  }
+}
+
+/**
  * Display modules by category with animations
  */
 async function displayModulesByCategory(result: DeviceThumbmarkResult) {
+  console.log('📊 Displaying modules, total:', result.modules.length);
+  console.log('Module names:', result.modules.map(m => m.name).join(', '));
+
   // Device UUID modules (Tor-resistant)
   const DEVICE_MODULES = [
     'floating-point', 'webgl-capabilities', 'perf-ratios', 'screen-aspect',
@@ -328,7 +375,7 @@ async function displayModulesByCategory(result: DeviceThumbmarkResult) {
   ];
 
   // Detection modules
-  const DETECTION_MODULES = ['tor-detection'];
+  const DETECTION_MODULES = ['tor-detection', 'vpn-detector'];
 
   // Separate modules by category
   const deviceModules = result.modules.filter(m => DEVICE_MODULES.includes(m.name));
@@ -337,17 +384,21 @@ async function displayModulesByCategory(result: DeviceThumbmarkResult) {
   );
   const detectionModules = result.modules.filter(m => DETECTION_MODULES.includes(m.name));
 
+  console.log(`📦 Categorized: ${deviceModules.length} device, ${fingerprintModules.length} fingerprint, ${detectionModules.length} detection`);
+
   // Update section badges
   updateSectionBadge('deviceModuleCount', deviceModules.length);
   updateSectionBadge('fingerprintModuleCount', fingerprintModules.length);
   updateSectionBadge('detectionModuleCount', detectionModules.length);
 
   // Display each category with staggered animation
+  console.log('🎨 Displaying device modules...');
   await displayModuleGrid('deviceModulesGrid', deviceModules, '🖥️');
-  await new Promise(resolve => setTimeout(resolve, ANIMATION_DELAY));
+  console.log('🎨 Displaying fingerprint modules...');
   await displayModuleGrid('fingerprintModulesGrid', fingerprintModules, '🔍');
-  await new Promise(resolve => setTimeout(resolve, ANIMATION_DELAY));
+  console.log('🎨 Displaying detection modules...');
   await displayModuleGrid('detectionModulesGrid', detectionModules, '🔬');
+  console.log('✅ All modules displayed');
 }
 
 /**
@@ -364,15 +415,23 @@ function updateSectionBadge(elementId: string, count: number) {
  * Display module cards in a grid with collapsible content
  */
 async function displayModuleGrid(gridId: string, modules: any[], icon: string) {
+  console.log(`🎨 displayModuleGrid(${gridId}): ${modules.length} modules`);
+
   const gridEl = document.getElementById(gridId);
-  if (!gridEl) return;
+  if (!gridEl) {
+    console.error(`❌ Grid element not found: ${gridId}`);
+    return;
+  }
 
   gridEl.innerHTML = '';
 
   if (modules.length === 0) {
+    console.warn(`⚠️  No modules for ${gridId}`);
     gridEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">No modules in this category</p>';
     return;
   }
+
+  console.log(`✅ Creating ${modules.length} cards for ${gridId}`);
 
   // Sort by entropy (descending)
   const sortedModules = [...modules].sort((a, b) => b.entropy - a.entropy);
@@ -685,14 +744,23 @@ function setupEventListeners() {
   });
 }
 
-// Auto-start on page load
-document.addEventListener('DOMContentLoaded', () => {
+// Auto-start on page load (only once!)
+let initialized = false;
+
+function initialize() {
+  if (initialized) {
+    console.log('⚠️  Already initialized, skipping duplicate call');
+    return;
+  }
+  initialized = true;
+  console.log('🚀 Initializing DeviceCreep...');
   setupEventListeners();
   displayResult();
-});
+}
+
+document.addEventListener('DOMContentLoaded', initialize);
 
 // Also start immediately if DOM already loaded
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
-  setupEventListeners();
-  displayResult();
+  initialize();
 }
