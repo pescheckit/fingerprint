@@ -39,7 +39,9 @@ import {
   KeystrokeDynamicsModule,
   MouseDynamicsModule,
   WebAssemblyCPUModule,
-  GamepadModule
+  GamepadModule,
+  ExtensionsModule,
+  OffscreenCanvasModule
 } from './modules/fingerprint';
 
 // Detection modules
