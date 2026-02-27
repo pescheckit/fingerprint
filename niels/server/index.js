@@ -22,7 +22,7 @@ app.use(express.json({ limit: '50kb' }));
 
 // Rate limiting: per-IP, sliding window
 const rateLimits = new Map();
-const RATE_LIMIT = 30;      // requests
+const RATE_LIMIT = 120;     // requests
 const RATE_WINDOW = 60_000; // per minute
 
 function rateLimit(req, res, next) {
@@ -71,6 +71,8 @@ app.post('/api/fingerprint', (req, res) => {
       localSubnet: data.localSubnet || null,
       batteryLevel: data.batteryLevel ?? null,
       batteryCharging: data.batteryCharging ?? null,
+      loginBitmask: data.loginBitmask || null,
+      lanTopology: data.lanTopology || null,
     };
 
     // Find matches using indexed candidate search
@@ -99,6 +101,8 @@ app.post('/api/fingerprint', (req, res) => {
       local_ip_subnet: signals.localSubnet,
       battery_level: signals.batteryLevel,
       battery_charging: signals.batteryCharging,
+      login_bitmask: signals.loginBitmask,
+      lan_topology: signals.lanTopology,
     });
 
     // Upsert household and update last active timestamp
@@ -184,6 +188,56 @@ app.get('/api/dns-probes', (req, res) => {
   }
 });
 
+// POST /api/ultrasonic/pair — emitter requests a pairing code
+app.post('/api/ultrasonic/pair', (req, res) => {
+  try {
+    const { visitorId } = req.body;
+    if (!visitorId || typeof visitorId !== 'string') {
+      return res.status(400).json({ error: 'visitorId is required' });
+    }
+
+    // Generate random 16-bit pairing code (0-65535)
+    const pairingCode = Math.floor(Math.random() * 65536);
+    store.createUltrasonicSession(pairingCode, visitorId);
+
+    res.json({ pairingCode });
+  } catch (err) {
+    console.error('POST /api/ultrasonic/pair error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/ultrasonic/confirm — receiver reports detected pairing code
+app.post('/api/ultrasonic/confirm', (req, res) => {
+  try {
+    const { visitorId, pairingCode } = req.body;
+    if (!visitorId || typeof visitorId !== 'string') {
+      return res.status(400).json({ error: 'visitorId is required' });
+    }
+    if (pairingCode == null || typeof pairingCode !== 'number') {
+      return res.status(400).json({ error: 'pairingCode is required' });
+    }
+
+    const session = store.findUltrasonicSession(pairingCode);
+    if (!session) {
+      return res.json({ matched: false, reason: 'No active session for this pairing code' });
+    }
+
+    // Link the two visitor IDs — receiver adopts emitter's visitor ID
+    const emitterVisitorId = session.visitor_id;
+
+    res.json({
+      matched: true,
+      emitterVisitorId,
+      receiverVisitorId: visitorId,
+      linkedVisitorId: emitterVisitorId,
+    });
+  } catch (err) {
+    console.error('POST /api/ultrasonic/confirm error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/stats — basic health check
 app.get('/api/stats', (req, res) => {
   try {
@@ -200,6 +254,7 @@ app.get('/api/stats', (req, res) => {
 setInterval(() => {
   try {
     const result = store.prune();
+    store.pruneUltrasonicSessions();
     if (result.duplicatesRemoved + result.staleRemoved + result.etagsRemoved > 0) {
       console.log('Pruned:', result);
     }

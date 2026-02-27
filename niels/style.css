@@ -745,3 +745,73 @@ body::after {
 @media (min-width: 1400px) {
   .signal-grid { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* === Ultrasonic Pairing Panel === */
+.ultra-panel {
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border-base);
+  border-radius: 6px;
+}
+
+.ultra-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--purple);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.35rem;
+}
+
+.ultra-desc {
+  font-size: 0.72rem;
+  color: var(--text-3);
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
+.ultra-btns {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ultra-btn {
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  background: var(--surface-3);
+  color: var(--text-1);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.ultra-btn:hover:not(:disabled) {
+  background: var(--surface-4);
+  border-color: var(--purple);
+  color: var(--purple);
+}
+
+.ultra-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ultra-btn.emit {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.ultra-btn.listen {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.ultra-status {
+  font-size: 0.72rem;
+  color: var(--text-2);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}

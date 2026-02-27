@@ -352,6 +352,68 @@ describe('Store', () => {
     });
   });
 
+  describe('login_bitmask and lan_topology columns', () => {
+    it('stores and retrieves login_bitmask', () => {
+      store.saveProfile(makeProfileData({
+        visitor_id: 'v-login',
+        login_bitmask: '11010100',
+      }));
+
+      const profile = store.getProfile('v-login');
+      assert.equal(profile.login_bitmask, '11010100');
+    });
+
+    it('stores and retrieves lan_topology', () => {
+      store.saveProfile(makeProfileData({
+        visitor_id: 'v-lan',
+        lan_topology: '11100000000000000000',
+      }));
+
+      const profile = store.getProfile('v-lan');
+      assert.equal(profile.lan_topology, '11100000000000000000');
+    });
+
+    it('stores null for missing login_bitmask and lan_topology', () => {
+      store.saveProfile(makeProfileData({ visitor_id: 'v-null-new' }));
+
+      const profile = store.getProfile('v-null-new');
+      assert.equal(profile.login_bitmask, null);
+      assert.equal(profile.lan_topology, null);
+    });
+  });
+
+  describe('ultrasonic sessions', () => {
+    it('creates and finds an active ultrasonic session', () => {
+      store.createUltrasonicSession(12345, 'visitor-emitter');
+
+      const session = store.findUltrasonicSession(12345);
+      assert.ok(session);
+      assert.equal(session.pairing_code, 12345);
+      assert.equal(session.visitor_id, 'visitor-emitter');
+    });
+
+    it('returns undefined for non-existent pairing code', () => {
+      const session = store.findUltrasonicSession(99999);
+      assert.equal(session, undefined);
+    });
+
+    it('creates multiple sessions with different codes', () => {
+      store.createUltrasonicSession(111, 'visitor-a');
+      store.createUltrasonicSession(222, 'visitor-b');
+
+      const sessionA = store.findUltrasonicSession(111);
+      const sessionB = store.findUltrasonicSession(222);
+      assert.equal(sessionA.visitor_id, 'visitor-a');
+      assert.equal(sessionB.visitor_id, 'visitor-b');
+    });
+
+    it('pruneUltrasonicSessions runs without error', () => {
+      store.createUltrasonicSession(333, 'visitor-c');
+      const result = store.pruneUltrasonicSessions();
+      assert.equal(typeof result.changes, 'number');
+    });
+  });
+
   describe('maintenance', () => {
     it('getStats returns profile count', () => {
       store.saveProfile(makeProfileData({ visitor_id: 'v1' }));

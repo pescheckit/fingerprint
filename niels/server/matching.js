@@ -125,12 +125,14 @@ export function calculateMatchScore(incoming, stored) {
 }
 
 export const CROSS_DEVICE_WEIGHTS = {
-  household:   0.30,
-  localSubnet: 0.20,
-  timezone:    0.15,
-  languages:   0.15,
-  ipSubnet:    0.10,
-  timingCorr:  0.10,
+  household:       0.22,
+  lanTopology:     0.15,
+  loginSimilarity: 0.13,
+  localSubnet:     0.13,
+  timezone:        0.12,
+  languages:       0.10,
+  ipSubnet:        0.08,
+  timingCorr:      0.07,
 };
 
 export function calculateCrossDeviceScore(incoming, stored) {
@@ -141,6 +143,47 @@ export function calculateCrossDeviceScore(incoming, stored) {
   if (incoming.householdId && stored.household_id && incoming.householdId === stored.household_id) {
     score += CROSS_DEVICE_WEIGHTS.household;
     matchedSignals.push('household');
+  }
+
+  // LAN topology (Hamming similarity on bitmask)
+  if (incoming.lanTopology && stored.lan_topology &&
+      incoming.lanTopology.length === stored.lan_topology.length) {
+    const len = incoming.lanTopology.length;
+    let matching = 0;
+    let inResponsive = 0;
+    let storedResponsive = 0;
+    for (let i = 0; i < len; i++) {
+      if (incoming.lanTopology[i] === stored.lan_topology[i]) matching++;
+      if (incoming.lanTopology[i] === '1') inResponsive++;
+      if (stored.lan_topology[i] === '1') storedResponsive++;
+    }
+    const similarity = matching / len;
+    // Require at least 3 responsive devices on both sides for meaningful signal
+    if (inResponsive >= 3 && storedResponsive >= 3) {
+      if (similarity >= 0.8) {
+        score += CROSS_DEVICE_WEIGHTS.lanTopology;
+        matchedSignals.push('lanTopology');
+      } else if (similarity >= 0.6) {
+        score += CROSS_DEVICE_WEIGHTS.lanTopology * 0.5;
+        matchedSignals.push('lanTopology');
+      }
+    }
+  }
+
+  // Login similarity (Hamming distance on login bitmask)
+  if (incoming.loginBitmask && stored.login_bitmask &&
+      incoming.loginBitmask.length === 8 && stored.login_bitmask.length === 8) {
+    let matching = 0;
+    for (let i = 0; i < 8; i++) {
+      if (incoming.loginBitmask[i] === stored.login_bitmask[i]) matching++;
+    }
+    if (matching >= 6) {
+      score += CROSS_DEVICE_WEIGHTS.loginSimilarity;
+      matchedSignals.push('loginSimilarity');
+    } else if (matching === 5) {
+      score += CROSS_DEVICE_WEIGHTS.loginSimilarity * 0.5;
+      matchedSignals.push('loginSimilarity');
+    }
   }
 
   // Local subnet (from WebRTC)

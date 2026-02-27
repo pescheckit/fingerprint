@@ -19,6 +19,9 @@ import { WebRTCCollector } from './src/collectors/network/webrtc.js';
 import { DnsProbeCollector } from './src/collectors/network/dns-probe.js';
 import { BatteryCollector } from './src/collectors/network/battery.js';
 import { MouseCollector } from './src/collectors/network/mouse.js';
+import { LoginDetectCollector } from './src/collectors/network/login-detect.js';
+import { LanTopologyCollector } from './src/collectors/network/lan-topology.js';
+import { UltrasonicCollector } from './src/collectors/network/ultrasonic.js';
 import { FingerprintClient } from './src/client.js';
 
 const API_ENDPOINT = 'https://bingo-barry.nl/fingerprint';
@@ -28,7 +31,7 @@ const results = document.getElementById('results');
 const CATEGORIES = {
   core:     { label: 'Core',     accent: '--cyan',   signals: ['canvas', 'webgl', 'audio', 'math'] },
   hardware: { label: 'Hardware', accent: '--amber',  signals: ['navigator', 'screen', 'webgpu', 'battery', 'mouse'] },
-  network:  { label: 'Network',  accent: '--purple', signals: ['timezone', 'webrtc', 'dns-probe'] },
+  network:  { label: 'Network',  accent: '--purple', signals: ['timezone', 'webrtc', 'dns-probe', 'loginDetect', 'lanTopology', 'ultrasonic'] },
   privacy:  { label: 'Privacy',  accent: '--green',  signals: ['storage', 'fonts', 'cssFeatures'] },
   advanced: { label: 'Advanced', accent: '--blue',   signals: ['jsEngine', 'performanceProfile', 'fontMetrics', 'media', 'intl'] },
 };
@@ -387,7 +390,8 @@ function showLoading() {
 
   const allSignals = ['canvas', 'webgl', 'navigator', 'screen', 'timezone', 'audio',
     'fonts', 'math', 'storage', 'jsEngine', 'cssFeatures', 'performanceProfile',
-    'fontMetrics', 'webgpu', 'media', 'intl', 'webrtc', 'battery', 'dns-probe', 'mouse'];
+    'fontMetrics', 'webgpu', 'media', 'intl', 'webrtc', 'battery', 'dns-probe', 'mouse',
+    'loginDetect', 'lanTopology', 'ultrasonic'];
 
   allSignals.forEach(name => {
     const el = document.createElement('span');
@@ -596,6 +600,43 @@ function buildDashboard(result, totalTime) {
   content.appendChild(tabBar);
   content.appendChild(grid);
 
+  // === Ultrasonic Pairing Panel ===
+  const ultraPanel = document.createElement('div');
+  ultraPanel.className = 'ultra-panel cascade';
+  ultraPanel.style.animationDelay = '0.3s';
+
+  const ultraTitle = document.createElement('div');
+  ultraTitle.className = 'ultra-title';
+  ultraTitle.textContent = 'Ultrasonic Pairing';
+
+  const ultraDesc = document.createElement('div');
+  ultraDesc.className = 'ultra-desc';
+  ultraDesc.textContent = 'Pair two devices in the same room using inaudible sound. One device emits, the other listens.';
+
+  const ultraBtns = document.createElement('div');
+  ultraBtns.className = 'ultra-btns';
+
+  const emitBtn = document.createElement('button');
+  emitBtn.className = 'ultra-btn emit';
+  emitBtn.textContent = 'Emit';
+
+  const listenBtn = document.createElement('button');
+  listenBtn.className = 'ultra-btn listen';
+  listenBtn.textContent = 'Listen';
+
+  const ultraStatus = document.createElement('div');
+  ultraStatus.className = 'ultra-status';
+  ultraStatus.textContent = 'Ready';
+
+  ultraBtns.appendChild(emitBtn);
+  ultraBtns.appendChild(listenBtn);
+
+  ultraPanel.appendChild(ultraTitle);
+  ultraPanel.appendChild(ultraDesc);
+  ultraPanel.appendChild(ultraBtns);
+  ultraPanel.appendChild(ultraStatus);
+  content.appendChild(ultraPanel);
+
   results.appendChild(topbar);
   results.appendChild(content);
 
@@ -610,7 +651,7 @@ function buildDashboard(result, totalTime) {
   typeReveal(deviceCard.hashEl, result.readableDeviceId || 'N/A', 18);
   typeReveal(visitorCard.hashEl, result.visitorId || 'N/A', 16);
 
-  return { visitorCard };
+  return { visitorCard, emitBtn, listenBtn, ultraStatus };
 }
 
 // --- Create identity card ---
@@ -736,6 +777,7 @@ async function collectFingerprint() {
   }
 
   const mouseCollector = new MouseCollector();
+  const ultrasonicCollector = new UltrasonicCollector();
   const dnsProbeCollector = new DnsProbeCollector();
   try {
     const probes = await client.fetchDnsProbes();
@@ -764,6 +806,9 @@ async function collectFingerprint() {
     .register(new IntlCollector())
     .register(new WebRTCCollector())
     .register(new BatteryCollector())
+    .register(new LoginDetectCollector())
+    .register(new LanTopologyCollector())
+    .register(ultrasonicCollector)
     .register(mouseCollector)
     .register(dnsProbeCollector);
 
@@ -775,6 +820,58 @@ async function collectFingerprint() {
 
   // Build the dashboard UI
   const refs = buildDashboard(result, totalTime);
+
+  // Wire up ultrasonic pairing buttons
+  refs.emitBtn.addEventListener('click', async () => {
+    refs.emitBtn.disabled = true;
+    refs.listenBtn.disabled = true;
+    refs.ultraStatus.textContent = 'Requesting pairing code...';
+    try {
+      const pairRes = await fetch(`${API_ENDPOINT}/api/ultrasonic/pair`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitorId: result.visitorId }),
+      });
+      const { pairingCode } = await pairRes.json();
+      refs.ultraStatus.textContent = `Emitting code ${pairingCode}...`;
+      await ultrasonicCollector.startEmitting(pairingCode);
+      refs.ultraStatus.textContent = `Done emitting (code ${pairingCode})`;
+    } catch (err) {
+      refs.ultraStatus.textContent = 'Emit error: ' + err.message;
+    }
+    refs.emitBtn.disabled = false;
+    refs.listenBtn.disabled = false;
+  });
+
+  refs.listenBtn.addEventListener('click', async () => {
+    refs.emitBtn.disabled = true;
+    refs.listenBtn.disabled = true;
+    refs.ultraStatus.textContent = 'Listening for ultrasonic signal...';
+    try {
+      const detected = await ultrasonicCollector.startReceiving(10000);
+      if (detected.detected && detected.pairingCode != null) {
+        refs.ultraStatus.textContent = `Detected code ${detected.pairingCode} (${(detected.confidence * 100).toFixed(0)}%) — confirming...`;
+        const confirmRes = await fetch(`${API_ENDPOINT}/api/ultrasonic/confirm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ visitorId: result.visitorId, pairingCode: detected.pairingCode }),
+        });
+        const confirmData = await confirmRes.json();
+        if (confirmData.matched) {
+          refs.ultraStatus.textContent = `Paired! Linked to ${confirmData.linkedVisitorId}`;
+          refs.ultraStatus.style.color = 'var(--green)';
+        } else {
+          refs.ultraStatus.textContent = 'No match: ' + (confirmData.reason || 'unknown');
+        }
+      } else {
+        refs.ultraStatus.textContent = 'No ultrasonic signal detected';
+      }
+    } catch (err) {
+      refs.ultraStatus.textContent = 'Listen error: ' + err.message;
+    }
+    refs.emitBtn.disabled = false;
+    refs.listenBtn.disabled = false;
+  });
 
   // Start background mouse observation, send update when done
   const effectiveVisitorIdRef = { value: result.visitorId };

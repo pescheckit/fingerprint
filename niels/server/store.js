@@ -69,6 +69,8 @@ export class Store {
       'ALTER TABLE profiles ADD COLUMN wheel_delta_mode INTEGER',
       'ALTER TABLE profiles ADD COLUMN smooth_scroll INTEGER',
       'ALTER TABLE profiles ADD COLUMN movement_min_step REAL',
+      'ALTER TABLE profiles ADD COLUMN login_bitmask TEXT',
+      'ALTER TABLE profiles ADD COLUMN lan_topology TEXT',
     ];
     for (const sql of newColumns) {
       try { this.db.exec(sql); } catch { /* column already exists */ }
@@ -76,6 +78,19 @@ export class Store {
 
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_profiles_household_id ON profiles(household_id);
+    `);
+
+    // Ultrasonic pairing sessions table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS ultrasonic_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pairing_code INTEGER NOT NULL,
+        visitor_id TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        expires_at TEXT DEFAULT (datetime('now', '+60 seconds'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_ultrasonic_code ON ultrasonic_sessions(pairing_code);
+      CREATE INDEX IF NOT EXISTS idx_ultrasonic_expires ON ultrasonic_sessions(expires_at);
     `);
   }
 
@@ -87,13 +102,15 @@ export class Store {
           audio_sum, timezone, timezone_offset, languages,
           screen_width, screen_height, hardware_concurrency,
           device_memory, platform, touch_support, color_depth,
-          household_id, local_ip_subnet, battery_level, battery_charging
+          household_id, local_ip_subnet, battery_level, battery_charging,
+          login_bitmask, lan_topology
         ) VALUES (
           @visitor_id, @fingerprint, @device_id, @ip, @ip_subnet,
           @audio_sum, @timezone, @timezone_offset, @languages,
           @screen_width, @screen_height, @hardware_concurrency,
           @device_memory, @platform, @touch_support, @color_depth,
-          @household_id, @local_ip_subnet, @battery_level, @battery_charging
+          @household_id, @local_ip_subnet, @battery_level, @battery_charging,
+          @login_bitmask, @lan_topology
         )
       `),
       getProfile: this.db.prepare(
@@ -168,6 +185,22 @@ export class Store {
         ORDER BY last_active DESC
         LIMIT 20
       `),
+
+      // Ultrasonic session operations
+      createUltrasonicSession: this.db.prepare(`
+        INSERT INTO ultrasonic_sessions (pairing_code, visitor_id)
+        VALUES (@pairing_code, @visitor_id)
+      `),
+      findUltrasonicSession: this.db.prepare(`
+        SELECT * FROM ultrasonic_sessions
+        WHERE pairing_code = @pairing_code
+          AND expires_at > datetime('now')
+        ORDER BY created_at DESC
+        LIMIT 1
+      `),
+      pruneUltrasonicSessions: this.db.prepare(
+        "DELETE FROM ultrasonic_sessions WHERE expires_at < datetime('now')"
+      ),
     };
   }
 
@@ -193,6 +226,8 @@ export class Store {
       local_ip_subnet: data.local_ip_subnet || null,
       battery_level: data.battery_level ?? null,
       battery_charging: data.battery_charging ?? null,
+      login_bitmask: data.login_bitmask || null,
+      lan_topology: data.lan_topology || null,
     });
   }
 
@@ -238,6 +273,8 @@ export class Store {
       localIpSubnet: 'local_ip_subnet',
       batteryLevel: 'battery_level',
       batteryCharging: 'battery_charging',
+      loginBitmask: 'login_bitmask',
+      lanTopology: 'lan_topology',
     };
 
     for (const [key, column] of Object.entries(fieldMap)) {
@@ -317,5 +354,21 @@ export class Store {
 
   findRecentProfiles(minutes = 30) {
     return this._stmts.findRecentProfiles.all(String(minutes));
+  }
+
+  // Ultrasonic session operations
+  createUltrasonicSession(pairingCode, visitorId) {
+    return this._stmts.createUltrasonicSession.run({
+      pairing_code: pairingCode,
+      visitor_id: visitorId,
+    });
+  }
+
+  findUltrasonicSession(pairingCode) {
+    return this._stmts.findUltrasonicSession.get({ pairing_code: pairingCode });
+  }
+
+  pruneUltrasonicSessions() {
+    return this._stmts.pruneUltrasonicSessions.run();
   }
 }

@@ -55,6 +55,12 @@ export class FingerprintClient {
       if (signal.name === 'dns-probe' && signal.data) {
         data.dnsProbes = signal.data.probes;
       }
+      if (signal.name === 'loginDetect' && signal.data) {
+        data.loginBitmask = signal.data.loginBitmask;
+      }
+      if (signal.name === 'lanTopology' && signal.data) {
+        data.lanTopology = signal.data.topologyBitmask;
+      }
     }
 
     return data;
