@@ -61,7 +61,7 @@ export class Store {
     const newColumns = [
       'ALTER TABLE profiles ADD COLUMN household_id TEXT',
       'ALTER TABLE profiles ADD COLUMN local_ip_subnet TEXT',
-      "ALTER TABLE profiles ADD COLUMN last_active TEXT DEFAULT (datetime('now'))",
+      'ALTER TABLE profiles ADD COLUMN last_active TEXT',
       'ALTER TABLE profiles ADD COLUMN battery_level REAL',
       'ALTER TABLE profiles ADD COLUMN battery_charging INTEGER',
     ];
