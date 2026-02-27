@@ -236,21 +236,33 @@ export class DeviceThumbmark {
     const deviceEntropy = calculateTotalEntropy(deviceModules);
     console.log('🔑 Device ID generated:', deviceId, 'Length:', deviceId.length);
 
-    // 2. Fingerprint UUID (deep, all signals)
-    const allHardwareModules = modules.filter(m => m.hardwareBased && m.data !== null);
+    // 2. Fingerprint UUID (deep BUT cross-browser stable!)
+    // MORE modules than Device UUID, but ONLY cross-browser stable
+    const FINGERPRINT_STABLE_MODULES = [
+      ...CROSS_BROWSER_MODULES,  // All 8 Device UUID modules
+      'webgl', 'audio', 'screen', 'performance', 'system',
+      'webrtc-leak', 'network-timing', 'fonts', 'speech-synthesis',
+      'webgpu', 'webassembly-cpu', 'gamepad'
+      // EXCLUDED: extensions, canvas, webgl-render (browser-specific variance)
+    ];
+
+    const fingerprintModules = modules.filter(m =>
+      FINGERPRINT_STABLE_MODULES.includes(m.name) && m.data !== null
+    );
+
     const fingerprintData: any = {};
-    for (const module of allHardwareModules) {
+    for (const module of fingerprintModules) {
       fingerprintData[module.name] = module.data;
     }
 
-    const fingerprintId = await hashObject(fingerprintData); // Deep fingerprint ID
-    const fingerprintEntropy = calculateTotalEntropy(allHardwareModules);
-    console.log('🔑 Fingerprint ID generated:', fingerprintId, 'Length:', fingerprintId.length);
+    const fingerprintId = await hashObject(fingerprintData); // Deep but cross-browser stable!
+    const fingerprintEntropy = calculateTotalEntropy(fingerprintModules);
+    console.log('🔑 Fingerprint ID generated:', fingerprintId, 'Length:', fingerprintId.length, `(${fingerprintModules.length} modules)`);
 
     if (this.options.debug) {
       console.log(`\n🎯 DUAL UUID SYSTEM:`);
       console.log(`   Device UUID: ${deviceId} (${deviceEntropy.toFixed(1)} bits, ${deviceModules.length} modules)`);
-      console.log(`   Fingerprint UUID: ${fingerprintId} (${fingerprintEntropy.toFixed(1)} bits, ${allHardwareModules.length} modules)`);
+      console.log(`   Fingerprint UUID: ${fingerprintId} (${fingerprintEntropy.toFixed(1)} bits, ${fingerprintModules.length} modules)`);
       console.log(`   ${isTor ? '🧅 Tor detected!' : '✓ Normal browser'}`);
     }
 
