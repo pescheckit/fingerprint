@@ -37,7 +37,9 @@ import {
   SpeechSynthesisModule,
   WebGPUModule,
   KeystrokeDynamicsModule,
-  MouseDynamicsModule
+  MouseDynamicsModule,
+  WebAssemblyCPUModule,
+  GamepadModule
 } from './modules/fingerprint';
 
 // Detection modules
