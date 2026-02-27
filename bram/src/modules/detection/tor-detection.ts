@@ -4,7 +4,7 @@
  * Combined detection methods with confidence scoring
  */
 
-import { ModuleInterface } from '../types';
+import { ModuleInterface } from '../../types';
 
 interface TorIndicators {
   // Hardware standardization
@@ -73,7 +73,7 @@ export class TorDetectionModule implements ModuleInterface {
     const { confidence, detectedMethods } = this.calculateConfidence(indicators);
 
     return {
-      isTor: confidence >= 50,
+      isTor: confidence > 65,
       confidence,
       indicators,
       detectedMethods
@@ -358,38 +358,19 @@ export class TorDetectionModule implements ModuleInterface {
     const detectedMethods: string[] = [];
     let score = 0;
     const weights: { [key: string]: number } = {
-      // CRITICAL: Mozilla/Mozilla pattern is almost always Tor 2026
-      webGLGeneric: 25,         // VERY strong - Mozilla/Mozilla is smoking gun
-
-      // CRITICAL: Canvas randomization is a key Tor fingerprinting defense
-      canvasRandomized: 25,     // VERY strong - Tor-specific behavior
-
-      // Hardware spoofing combo is very strong
-      fixedCores: 18,           // Strong - power of 2 cores pattern
-      fixedMemory: 18,          // Strong - null or power of 2 memory
-
-      // WebGL blocking is strong but less common now
+      fixedCores: 25,           // Very strong indicator
+      fixedMemory: 20,          // Strong indicator
+      genericUA: 20,            // Strong but can be spoofed
+      forcedEnUS: 15,           // Moderate - locale mismatches common
+      torCommonResolution: 15,  // Moderate - many false positives
       webGLBlocked: 20,         // Strong indicator
-
-      // Browser standardization
-      genericUA: 20,            // Strong - exact Tor UA match
-      uaConsistency: 15,        // Moderate - inconsistencies detected
-
-      // Locale forcing
-      forcedEnUS: 12,           // Moderate - locale mismatches common
-
-      // Resolution patterns
-      resolutionRounded: 15,    // Moderate - Tor rounds to 100px
-      torCommonResolution: 12,  // Moderate - many false positives
-
-      // Timing attacks protection
-      timingAnomaly: 12,        // Moderate - 100ms clamping
-
-      // Font fingerprinting defense
+      webGLGeneric: 15,         // Moderate
+      canvasRandomized: 12,     // Weak to moderate
+      uaConsistency: 15,        // Moderate
+      highLatency: 10,          // Weak - hard to measure accurately
+      timingAnomaly: 12,        // Moderate
       limitedFonts: 10,         // Weak - many systems have limited fonts
-
-      // Network latency (hard to measure accurately)
-      highLatency: 8            // Weak - unreliable measurement
+      resolutionRounded: 10     // Weak - many systems have rounded resolutions
     };
 
     let totalWeight = 0;

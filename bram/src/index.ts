@@ -14,11 +14,25 @@ export type {
 
 // Re-export modules for advanced usage
 export {
+  // Device modules (Tor-resistant)
+  FloatingPointModule,
+  WebGLCapabilitiesModule,
+  PerformanceRatioModule,
+  ScreenAspectModule,
+  HardwareModule,
+  CanvasPropertiesModule,
+  TouchCapabilitiesModule,
+  ColorDepthModule,
+
+  // Fingerprint modules (browser-specific)
   WebGLModule,
+  WebGLRenderModule,
   CanvasModule,
   AudioModule,
   ScreenModule,
-  HardwareModule,
+  PerformanceModule,
   SystemModule,
-  ProtocolsModule
+
+  // Detection modules
+  TorDetectionModule
 } from './modules';

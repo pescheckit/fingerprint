@@ -228,9 +228,17 @@
 
     <div id="result" style="display: none;">
       <div class="device-id-card">
-        <h2>Your Device ID</h2>
-        <div class="device-id" id="deviceId"></div>
-        <p style="opacity: 0.9; font-size: 1rem;" id="confidence"></p>
+        <h2>🖥️ Device UUID (Cross-Browser)</h2>
+        <div class="device-id" id="deviceId" style="font-size: 2rem;"></div>
+        <p style="opacity: 0.8; font-size: 0.85rem; margin-top: 0.5rem;">
+          Same across Chrome, Firefox, Safari, Edge, and Tor
+        </p>
+      </div>
+
+      <div class="device-id-card" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); margin-top: 1rem;">
+        <h2>🔍 Fingerprint UUID (Deep)</h2>
+        <div class="device-id" id="fingerprintId" style="font-size: 1.5rem;"></div>
+        <p style="opacity: 0.8; font-size: 0.85rem; margin-top: 0.5rem;" id="confidence"></p>
       </div>
 
       <div class="stats">
@@ -254,8 +262,25 @@
         <button id="btnExport">💾 Export Results (JSON)</button>
       </div>
 
-      <h2 style="margin: 2rem 0 1rem 0; color: #333;">Hardware Modules Detected</h2>
-      <div class="modules-grid" id="modulesGrid"></div>
+      <div style="margin: 2rem 0;">
+        <input
+          type="text"
+          id="moduleSearch"
+          placeholder="🔍 Search modules... (e.g., 'webgl', 'audio', 'tor')"
+          style="width: 100%; padding: 1rem; border: 2px solid #e0e0e0; border-radius: 0.5rem; font-size: 1rem;"
+        />
+      </div>
+
+      <h2 style="margin: 2rem 0 1rem 0; color: #333;">🖥️ Device UUID Modules (Cross-Browser, Tor-Resistant)</h2>
+      <p style="color: #666; margin-bottom: 1rem;">These modules work identically across Chrome, Firefox, Safari, Edge, and Tor</p>
+      <div class="modules-grid" id="deviceModulesGrid"></div>
+
+      <h2 style="margin: 3rem 0 1rem 0; color: #333;">🔍 Fingerprint UUID Modules (Deep, Browser-Specific)</h2>
+      <p style="color: #666; margin-bottom: 1rem;">These modules provide high entropy but may vary across browsers</p>
+      <div class="modules-grid" id="fingerprintModulesGrid"></div>
+
+      <h2 style="margin: 3rem 0 1rem 0; color: #333;">🔬 Detection Modules</h2>
+      <div class="modules-grid" id="detectionModulesGrid"></div>
     </div>
   </div>
 

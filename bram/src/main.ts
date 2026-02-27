@@ -26,16 +26,22 @@ async function displayResult() {
     loadingEl.style.display = 'none';
     resultEl.style.display = 'block';
 
-    // Display device ID
+    // Display device UUID (cross-browser)
     const deviceIdEl = document.getElementById('deviceId');
     if (deviceIdEl) {
       deviceIdEl.textContent = currentResult.deviceId;
     }
 
-    // Display confidence
+    // Display fingerprint UUID (deep)
+    const fingerprintIdEl = document.getElementById('fingerprintId');
+    if (fingerprintIdEl) {
+      fingerprintIdEl.textContent = currentResult.fingerprintId;
+    }
+
+    // Display confidence with both entropies
     const confidenceEl = document.getElementById('confidence');
     if (confidenceEl) {
-      confidenceEl.textContent = `Confidence: ${currentResult.confidence}% | Stability: ${currentResult.stability}%`;
+      confidenceEl.textContent = `Device: ${currentResult.deviceEntropy.toFixed(1)} bits | Fingerprint: ${currentResult.fingerprintEntropy.toFixed(1)} bits | Confidence: ${currentResult.confidence}%`;
     }
 
     // Display stats
@@ -55,8 +61,8 @@ async function displayResult() {
       modulesEl.textContent = `${hardwareCount}/${currentResult.modules.length}`;
     }
 
-    // Display modules
-    displayModules(currentResult);
+    // Display modules by category
+    displayModulesByCategory(currentResult);
 
   } catch (error) {
     console.error('Failed to generate thumbmark:', error);
@@ -72,16 +78,47 @@ async function displayResult() {
 }
 
 /**
- * Display module cards
+ * Display modules by category
  */
-function displayModules(result: DeviceThumbmarkResult) {
-  const gridEl = document.getElementById('modulesGrid');
+function displayModulesByCategory(result: DeviceThumbmarkResult) {
+  // Device UUID modules (Tor-resistant)
+  const DEVICE_MODULES = [
+    'floating-point', 'webgl-capabilities', 'perf-ratios', 'screen-aspect',
+    'hardware', 'canvas-properties', 'touch-capabilities', 'color-depth'
+  ];
+
+  // Detection modules
+  const DETECTION_MODULES = ['tor-detection'];
+
+  // Separate modules by category
+  const deviceModules = result.modules.filter(m => DEVICE_MODULES.includes(m.name));
+  const fingerprintModules = result.modules.filter(m =>
+    !DEVICE_MODULES.includes(m.name) && !DETECTION_MODULES.includes(m.name)
+  );
+  const detectionModules = result.modules.filter(m => DETECTION_MODULES.includes(m.name));
+
+  // Display each category
+  displayModuleGrid('deviceModulesGrid', deviceModules, '🖥️');
+  displayModuleGrid('fingerprintModulesGrid', fingerprintModules, '🔍');
+  displayModuleGrid('detectionModulesGrid', detectionModules, '🔬');
+}
+
+/**
+ * Display module cards in a grid
+ */
+function displayModuleGrid(gridId: string, modules: any[], icon: string) {
+  const gridEl = document.getElementById(gridId);
   if (!gridEl) return;
 
   gridEl.innerHTML = '';
 
-  // Sort by entropy (most valuable first)
-  const sortedModules = [...result.modules].sort((a, b) => b.entropy - a.entropy);
+  if (modules.length === 0) {
+    gridEl.innerHTML = '<p style="color: #999; text-align: center; padding: 2rem;">No modules in this category</p>';
+    return;
+  }
+
+  // Sort by entropy
+  const sortedModules = [...modules].sort((a, b) => b.entropy - a.entropy);
 
   for (const module of sortedModules) {
     const card = document.createElement('div');
@@ -93,7 +130,7 @@ function displayModules(result: DeviceThumbmarkResult) {
 
     card.innerHTML = `
       <h3>
-        ${formatModuleName(module.name)}
+        ${icon} ${formatModuleName(module.name)}
         ${badge}
       </h3>
       <div style="margin-bottom: 0.5rem; color: #666; font-size: 0.9rem;">
@@ -117,9 +154,52 @@ function formatModuleName(name: string): string {
 }
 
 /**
+ * Filter modules by search query
+ */
+function filterModules(query: string) {
+  const allCards = document.querySelectorAll('.module-card');
+
+  allCards.forEach((card) => {
+    const cardElement = card as HTMLElement;
+    const cardText = cardElement.textContent?.toLowerCase() || '';
+    const moduleName = cardElement.querySelector('h3')?.textContent?.toLowerCase() || '';
+
+    if (query === '' || moduleName.includes(query) || cardText.includes(query)) {
+      cardElement.style.display = 'block';
+    } else {
+      cardElement.style.display = 'none';
+    }
+  });
+
+  // Show/hide category headers if all cards hidden
+  ['deviceModulesGrid', 'fingerprintModulesGrid', 'detectionModulesGrid'].forEach(gridId => {
+    const grid = document.getElementById(gridId);
+    if (grid) {
+      const visibleCards = Array.from(grid.querySelectorAll('.module-card')).filter(
+        (card) => (card as HTMLElement).style.display !== 'none'
+      );
+
+      const header = grid.previousElementSibling?.previousElementSibling as HTMLElement;
+      if (header && header.tagName === 'H2') {
+        header.style.display = visibleCards.length > 0 ? 'block' : 'none';
+      }
+    }
+  });
+}
+
+/**
  * Setup event listeners (Tor-compatible - no inline handlers)
  */
 function setupEventListeners() {
+  // Search/filter modules
+  const searchInput = document.getElementById('moduleSearch') as HTMLInputElement;
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const query = (e.target as HTMLInputElement).value.toLowerCase();
+      filterModules(query);
+    });
+  }
+
   // Regenerate button
   const btnRegenerate = document.getElementById('btnRegenerate');
   if (btnRegenerate) {
