@@ -73,7 +73,7 @@ export class TorDetectionModule implements ModuleInterface {
     const { confidence, detectedMethods } = this.calculateConfidence(indicators);
 
     return {
-      isTor: confidence > 65,
+      isTor: confidence >= 60,  // Lowered from 65 to 60 for better sensitivity
       confidence,
       indicators,
       detectedMethods
@@ -358,19 +358,19 @@ export class TorDetectionModule implements ModuleInterface {
     const detectedMethods: string[] = [];
     let score = 0;
     const weights: { [key: string]: number } = {
-      fixedCores: 25,           // Very strong indicator
-      fixedMemory: 20,          // Strong indicator
-      genericUA: 20,            // Strong but can be spoofed
-      forcedEnUS: 15,           // Moderate - locale mismatches common
-      torCommonResolution: 15,  // Moderate - many false positives
-      webGLBlocked: 20,         // Strong indicator
-      webGLGeneric: 15,         // Moderate
-      canvasRandomized: 12,     // Weak to moderate
-      uaConsistency: 15,        // Moderate
-      highLatency: 10,          // Weak - hard to measure accurately
-      timingAnomaly: 12,        // Moderate
-      limitedFonts: 10,         // Weak - many systems have limited fonts
-      resolutionRounded: 10     // Weak - many systems have rounded resolutions
+      fixedCores: 40,           // Very strong indicator - Tor always spoofs to 2/4/8
+      fixedMemory: 35,          // Very strong indicator - Tor spoofs or removes
+      webGLGeneric: 30,         // Very strong - Mozilla/Mozilla is definitive Tor 2026
+      genericUA: 25,            // Strong but can be spoofed
+      webGLBlocked: 25,         // Strong indicator
+      canvasRandomized: 20,     // Strong - indicates active fingerprint resistance
+      forcedEnUS: 12,           // Moderate - locale mismatches common
+      torCommonResolution: 12,  // Moderate - many false positives
+      uaConsistency: 12,        // Moderate
+      timingAnomaly: 10,        // Moderate
+      limitedFonts: 15,         // Moderate - Tor restricts font access
+      resolutionRounded: 15,    // Moderate - Tor rounds to 100px
+      highLatency: 5            // Weak - hard to measure accurately
     };
 
     let totalWeight = 0;

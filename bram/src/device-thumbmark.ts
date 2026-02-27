@@ -30,12 +30,24 @@ import {
   AudioModule,
   ScreenModule,
   PerformanceModule,
-  SystemModule
+  SystemModule,
+  WebRTCLeakModule,
+  NetworkTimingModule,
+  FontsModule,
+  SpeechSynthesisModule,
+  WebGPUModule,
+  KeystrokeDynamicsModule,
+  MouseDynamicsModule,
+  WebAssemblyCPUModule,
+  GamepadModule,
+  ExtensionsModule,
+  OffscreenCanvasModule
 } from './modules/fingerprint';
 
 // Detection modules
 import {
-  TorDetectionModule
+  TorDetectionModule,
+  VPNDetectorModule
 } from './modules/detection';
 
 export class DeviceThumbmark {
@@ -64,6 +76,18 @@ export class DeviceThumbmark {
 
       // TIER 2: BROWSER-SPECIFIC (extra entropy on normal browsers)
       new TorDetectionModule(),       // Tor detection - 8 bits, 90%
+      new VPNDetectorModule(),        // VPN detection - 0 bits (detection only) 🆕
+      new WebRTCLeakModule(),         // IP leak - 10 bits, 85% (proxy-resistant!) 🆕
+      new NetworkTimingModule(),      // Network timing - 8 bits, 75% (proxy-resistant!) 🆕
+      new FontsModule(),              // Fonts - 7 bits, 92% (educational!) 🆕
+      new SpeechSynthesisModule(),    // Speech - 5 bits, 95% (educational!) 🆕
+      new ExtensionsModule(),         // Extensions - 10 bits, 80% (educational!) 🆕
+      new OffscreenCanvasModule(),    // Offscreen Canvas - 8 bits, 88% (educational!) 🆕
+      new WebGPUModule(),             // WebGPU - 18 bits, 90% (educational!) 🆕
+      new KeystrokeDynamicsModule(),  // Keystroke - 8 bits, 70% (behavioral!) 🆕
+      new MouseDynamicsModule(),      // Mouse - 8 bits, 70% (behavioral!) 🆕
+      new WebAssemblyCPUModule(),     // WASM CPU - 12 bits, 85% (hardware!) 🆕
+      new GamepadModule(),            // Gamepad - 4 bits, 95% (hardware!) 🆕
       new WebGLModule(),              // GPU strings - 12 bits, 95% (spoofed on Tor)
       new WebGLRenderModule(),        // GPU rendering - 10 bits, 95% (randomized on Tor)
       new ScreenModule(),             // Exact dims - 8 bits, 95% (rounded on Tor)
@@ -73,7 +97,7 @@ export class DeviceThumbmark {
       new SystemModule()              // OS info - 4 bits, 90% (standardized on Tor)
     ];
     // TIER 1 = 27 bits (works on ALL browsers including Tor!)
-    // TIER 1+2 = 68 bits (only on normal browsers)
+    // TIER 1+2 = 136+ bits (only on normal browsers, includes WebGPU + behavioral + hardware + extensions detection!)
   }
 
   /**
@@ -210,6 +234,7 @@ export class DeviceThumbmark {
 
     const deviceId = await hashObject(deviceData); // Cross-browser device ID
     const deviceEntropy = calculateTotalEntropy(deviceModules);
+    console.log('🔑 Device ID generated:', deviceId, 'Length:', deviceId.length);
 
     // 2. Fingerprint UUID (deep, all signals)
     const allHardwareModules = modules.filter(m => m.hardwareBased && m.data !== null);
@@ -220,6 +245,7 @@ export class DeviceThumbmark {
 
     const fingerprintId = await hashObject(fingerprintData); // Deep fingerprint ID
     const fingerprintEntropy = calculateTotalEntropy(allHardwareModules);
+    console.log('🔑 Fingerprint ID generated:', fingerprintId, 'Length:', fingerprintId.length);
 
     if (this.options.debug) {
       console.log(`\n🎯 DUAL UUID SYSTEM:`);
