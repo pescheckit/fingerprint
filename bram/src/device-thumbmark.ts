@@ -210,6 +210,7 @@ export class DeviceThumbmark {
 
     const deviceId = await hashObject(deviceData); // Cross-browser device ID
     const deviceEntropy = calculateTotalEntropy(deviceModules);
+    console.log('🔑 Device ID generated:', deviceId, 'Length:', deviceId.length);
 
     // 2. Fingerprint UUID (deep, all signals)
     const allHardwareModules = modules.filter(m => m.hardwareBased && m.data !== null);
@@ -220,6 +221,7 @@ export class DeviceThumbmark {
 
     const fingerprintId = await hashObject(fingerprintData); // Deep fingerprint ID
     const fingerprintEntropy = calculateTotalEntropy(allHardwareModules);
+    console.log('🔑 Fingerprint ID generated:', fingerprintId, 'Length:', fingerprintId.length);
 
     if (this.options.debug) {
       console.log(`\n🎯 DUAL UUID SYSTEM:`);

@@ -46,11 +46,15 @@ function saveTheme(theme: 'light' | 'dark'): void {
 }
 
 function applyTheme(theme: 'light' | 'dark'): void {
+  console.log(`🎨 Applying theme: ${theme}`);
   if (theme === 'dark') {
     document.documentElement.setAttribute('data-theme', 'dark');
+    document.body.classList.add('dark-mode');
   } else {
     document.documentElement.removeAttribute('data-theme');
+    document.body.classList.remove('dark-mode');
   }
+  console.log('✅ Theme applied, data-theme:', document.documentElement.getAttribute('data-theme'));
 }
 
 function getCurrentTheme(): 'light' | 'dark' {
@@ -149,6 +153,8 @@ async function displayResult() {
     }
 
     // Display UUIDs with typing animation
+    console.log('Device ID to display:', currentResult.deviceId, 'Length:', currentResult.deviceId.length);
+    console.log('Fingerprint ID to display:', currentResult.fingerprintId, 'Length:', currentResult.fingerprintId.length);
     animateText('deviceId', currentResult.deviceId, 30);
     animateText('fingerprintId', currentResult.fingerprintId, 30);
 
@@ -193,17 +199,35 @@ async function displayResult() {
  */
 function animateText(elementId: string, text: string, speed: number = 50) {
   const element = document.getElementById(elementId);
-  if (!element) return;
+  if (!element) {
+    console.error(`Element ${elementId} not found!`);
+    return;
+  }
 
+  console.log(`Animating ${elementId}: "${text}" (${text.length} chars)`);
+
+  // CRITICAL: Clear existing content AND stop any running animations
   element.textContent = '';
+  element.setAttribute('data-animating', 'true');
+
   let index = 0;
+  let animatedText = ''; // Build in variable, not DOM
 
   const interval = setInterval(() => {
+    // Check if element was cleared externally (new animation started)
+    if (element.getAttribute('data-animating') !== 'true') {
+      clearInterval(interval);
+      return;
+    }
+
     if (index < text.length) {
-      element.textContent += text[index];
+      animatedText += text[index];
+      element.textContent = animatedText; // Set directly, don't append
       index++;
     } else {
       clearInterval(interval);
+      element.removeAttribute('data-animating');
+      console.log(`Animation complete for ${elementId}: "${element.textContent}" (${element.textContent.length} chars)`);
     }
   }, speed);
 }
@@ -531,9 +555,13 @@ function setupEventListeners() {
   // Theme toggle button
   const themeToggle = document.getElementById('themeToggle');
   if (themeToggle) {
+    console.log('✅ Theme toggle button found, attaching listener');
     themeToggle.addEventListener('click', () => {
+      console.log('🖱️ Theme toggle clicked!');
       toggleTheme();
     });
+  } else {
+    console.error('❌ Theme toggle button not found!');
   }
 
   // Listen for system theme changes
