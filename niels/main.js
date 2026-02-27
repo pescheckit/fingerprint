@@ -63,10 +63,28 @@ async function collectFingerprint() {
 
   results.innerHTML = '';
 
+  const hashSection = document.createElement('div');
+  hashSection.className = 'hash-section';
+
+  const hashLabel = document.createElement('h2');
+  hashLabel.textContent = 'Browser Fingerprint';
+  hashSection.appendChild(hashLabel);
+
   const hashEl = document.createElement('div');
   hashEl.id = 'fingerprint-hash';
   hashEl.textContent = result.hash;
-  results.appendChild(hashEl);
+  hashSection.appendChild(hashEl);
+
+  const crossLabel = document.createElement('h2');
+  crossLabel.textContent = 'Cross-Browser ID';
+  hashSection.appendChild(crossLabel);
+
+  const crossHashEl = document.createElement('div');
+  crossHashEl.id = 'cross-browser-hash';
+  crossHashEl.textContent = result.crossBrowserHash || 'N/A';
+  hashSection.appendChild(crossHashEl);
+
+  results.appendChild(hashSection);
 
   for (const signal of result.signals) {
     results.appendChild(renderSignalGroup(signal));

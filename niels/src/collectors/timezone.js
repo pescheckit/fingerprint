@@ -10,7 +10,9 @@ import { Collector } from '../collector.js';
  */
 export class TimezoneCollector extends Collector {
   constructor() {
-    super('timezone', 'Timezone and locale information');
+    super('timezone', 'Timezone and locale information', [
+      'timezone', 'timezoneOffset', 'locale', 'calendar',
+    ]);
   }
 
   async collect() {

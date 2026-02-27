@@ -10,7 +10,11 @@ import { Collector } from '../collector.js';
  */
 export class ScreenCollector extends Collector {
   constructor() {
-    super('screen', 'Screen and display properties');
+    super('screen', 'Screen and display properties', [
+      'width', 'height', 'availWidth', 'availHeight',
+      'colorDepth', 'devicePixelRatio', 'maxTouchPoints',
+      'touchSupport', 'screenFrame',
+    ]);
   }
 
   async collect() {

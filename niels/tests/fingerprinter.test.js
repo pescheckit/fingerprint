@@ -3,8 +3,8 @@ import { Fingerprinter } from '../src/fingerprinter.js';
 import { Collector } from '../src/collector.js';
 
 class FakeCollector extends Collector {
-  constructor(name, data) {
-    super(name, `Fake ${name}`);
+  constructor(name, data, crossBrowserKeys = []) {
+    super(name, `Fake ${name}`, crossBrowserKeys);
     this._data = data;
   }
 
@@ -81,5 +81,48 @@ describe('Fingerprinter', () => {
     const fp = new Fingerprinter();
     const result = fp.register(new FakeCollector('a', {}));
     expect(result).toBe(fp);
+  });
+
+  it('produces a cross-browser hash from tagged keys', async () => {
+    const fp = new Fingerprinter();
+    fp.register(new FakeCollector('screen', { width: 1920, height: 1080, ua: 'Chrome' }, ['width', 'height']));
+    fp.register(new FakeCollector('canvas', { rendered: 'abc123' }));
+
+    const result = await fp.collect();
+
+    expect(result.hash).toBeTruthy();
+    expect(result.crossBrowserHash).toBeTruthy();
+    expect(result.crossBrowserHash).not.toBe(result.hash);
+
+    // crossBrowserData should only have tagged keys
+    expect(result.signals[0].crossBrowserData).toEqual({ width: 1920, height: 1080 });
+    // canvas has no cross-browser keys
+    expect(result.signals[1].crossBrowserData).toBeNull();
+  });
+
+  it('cross-browser hash is same regardless of browser-specific signals', async () => {
+    const fp1 = new Fingerprinter();
+    fp1.register(new FakeCollector('hw', { cores: 8, ua: 'Chrome/120' }, ['cores']));
+
+    const fp2 = new Fingerprinter();
+    fp2.register(new FakeCollector('hw', { cores: 8, ua: 'Firefox/121' }, ['cores']));
+
+    const r1 = await fp1.collect();
+    const r2 = await fp2.collect();
+
+    // Full hashes differ (different ua)
+    expect(r1.hash).not.toBe(r2.hash);
+    // Cross-browser hashes match (same cores)
+    expect(r1.crossBrowserHash).toBe(r2.crossBrowserHash);
+  });
+
+  it('cross-browser hash is null when no collectors have cross-browser keys', async () => {
+    const fp = new Fingerprinter();
+    fp.register(new FakeCollector('canvas', { data: 'abc' }));
+
+    const result = await fp.collect();
+
+    expect(result.hash).toBeTruthy();
+    expect(result.crossBrowserHash).toBeNull();
   });
 });

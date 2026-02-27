@@ -9,7 +9,9 @@ import { Collector } from '../collector.js';
  */
 export class NavigatorCollector extends Collector {
   constructor() {
-    super('navigator', 'Browser and device properties');
+    super('navigator', 'Browser and device properties', [
+      'hardwareConcurrency', 'maxTouchPoints',
+    ]);
   }
 
   async collect() {
