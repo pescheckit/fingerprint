@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebGPU Module Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      max-width: 1000px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f7;
+    }
+    h1 {
+      color: #1d1d1f;
+    }
+    .result {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .status {
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-weight: 600;
+    }
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+    }
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .status.info {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+    pre {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎯 WebGPU Module Test</h1>
+  <p>Testing the WebGPU fingerprinting module based on LockedApart (2025) research.</p>
+
+  <button id="testButton">Run WebGPU Test</button>
+
+  <div id="results"></div>
+
+  <script type="module">
+    import { DeviceThumbmark } from './src/device-thumbmark.ts';
+
+    const testButton = document.getElementById('testButton');
+    const resultsDiv = document.getElementById('results');
+
+    testButton.addEventListener('click', async () => {
+      testButton.disabled = true;
+      resultsDiv.innerHTML = '<div class="result"><div class="status info">Running test...</div></div>';
+
+      try {
+        // Check if WebGPU is available
+        const isWebGPUAvailable = 'gpu' in navigator;
+
+        let html = `<div class="result">`;
+
+        if (!isWebGPUAvailable) {
+          html += `<div class="status error">❌ WebGPU is not available in this browser</div>`;
+          html += `<p>Your browser does not support WebGPU. Try:</p>`;
+          html += `<ul>`;
+          html += `<li>Chrome/Edge 113+ (enable chrome://flags/#enable-unsafe-webgpu if needed)</li>`;
+          html += `<li>Firefox Nightly with dom.webgpu.enabled = true</li>`;
+          html += `</ul>`;
+        } else {
+          html += `<div class="status success">✅ WebGPU API is available</div>`;
+
+          // Test the module directly
+          const thumbmark = new DeviceThumbmark({ debug: true });
+          const result = await thumbmark.generate();
+
+          // Find WebGPU module data
+          const webgpuModule = result.modules.find(m => m.name === 'webgpu');
+
+          if (webgpuModule) {
+            html += `<h3>✅ WebGPU Module Successfully Collected</h3>`;
+            html += `<p><strong>Entropy:</strong> ${webgpuModule.entropy} bits</p>`;
+            html += `<p><strong>Stability:</strong> ${webgpuModule.stability}%</p>`;
+            html += `<p><strong>Hardware-based:</strong> ${webgpuModule.hardwareBased ? 'Yes' : 'No'}</p>`;
+            html += `<h4>Collected Data:</h4>`;
+            html += `<pre>${JSON.stringify(webgpuModule.data, null, 2)}</pre>`;
+          } else {
+            html += `<div class="status error">❌ WebGPU module was not included in results</div>`;
+          }
+
+          html += `<h3>Overall Results</h3>`;
+          html += `<p><strong>Device ID:</strong> <code>${result.deviceId}</code></p>`;
+          html += `<p><strong>Fingerprint ID:</strong> <code>${result.fingerprintId}</code></p>`;
+          html += `<p><strong>Total Entropy:</strong> ${result.entropy.toFixed(1)} bits</p>`;
+          html += `<p><strong>Total Modules:</strong> ${result.modules.length}</p>`;
+          html += `<p><strong>Tor Detected:</strong> ${result.isTor ? 'Yes' : 'No'}</p>`;
+        }
+
+        html += `</div>`;
+        resultsDiv.innerHTML = html;
+
+      } catch (error) {
+        resultsDiv.innerHTML = `
+          <div class="result">
+            <div class="status error">❌ Error during test</div>
+            <pre>${error.message}\n\n${error.stack}</pre>
+          </div>
+        `;
+      } finally {
+        testButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
