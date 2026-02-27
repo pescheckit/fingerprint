@@ -245,12 +245,14 @@ export class DeviceThumbmark {
       // Add more stable modules (NO browser-specific strings!):
       'audio', 'screen', 'performance', 'system',
       'webrtc-leak', 'network-timing', 'fonts', 'speech-synthesis',
-      'webgpu', 'webassembly-cpu', 'gamepad'
-      // EXCLUDED for cross-browser stability:
+      'webgpu', 'webassembly-cpu', 'gamepad', 'offscreen-canvas'
+      // EXCLUDED for cross-browser/session stability:
       // - webgl (renderer strings differ per browser!)
       // - extensions (browser-specific!)
       // - canvas (rendering engine differences!)
       // - webgl-render (pixel differences!)
+      // - mouse-dynamics (changes per session!)
+      // - keystroke-dynamics (changes per session!)
     ];
 
     const fingerprintModules = modules.filter(m =>
