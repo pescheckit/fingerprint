@@ -7,6 +7,8 @@ const THEMES = [
   { value: 'brutalist', label: 'Brutalist' },
   { value: 'hud', label: 'Sci-Fi HUD' },
   { value: 'vapor', label: 'Vaporwave' },
+  { value: 'aero', label: 'Apple Aero' },
+  { value: 'winamp', label: 'Winamp' },
 ];
 
 const THEME_STORAGE_KEY = 'dennie_theme';
@@ -883,7 +885,6 @@ function renderDashboard(signals, hardwareHash, browserHash, previous) {
     hwGrid.appendChild(cell);
   }
   hwGroup.appendChild(hwGrid);
-  body.appendChild(hwGroup);
 
   // === Browser-Specific Signals (used in Browser Hash only) ===
   const bsGroup = el('div', 'group-box');
@@ -915,7 +916,12 @@ function renderDashboard(signals, hardwareHash, browserHash, previous) {
     bsGrid.appendChild(cell);
   }
   bsGroup.appendChild(bsGrid);
-  body.appendChild(bsGroup);
+
+  // Wrap both groups for side-by-side layout in some themes
+  const groupsRow = el('div', 'groups-row');
+  groupsRow.appendChild(hwGroup);
+  groupsRow.appendChild(bsGroup);
+  body.appendChild(groupsRow);
 
   // === Tabbed signal details ===
   const categories = Object.entries(signals).filter(([, v]) => v !== null);
@@ -934,7 +940,8 @@ function renderDashboard(signals, hardwareHash, browserHash, previous) {
     });
     tabsRow.appendChild(tab);
   });
-  body.appendChild(tabsRow);
+  const tabsSection = el('div', 'tabs-section');
+  tabsSection.appendChild(tabsRow);
 
   categories.forEach(([category, data], i) => {
     const content = el('div', 'tab-content' + (i === 0 ? ' active' : ''));
@@ -972,8 +979,9 @@ function renderDashboard(signals, hardwareHash, browserHash, previous) {
     }
 
     tabContents.push(content);
-    body.appendChild(content);
+    tabsSection.appendChild(content);
   });
+  body.appendChild(tabsSection);
 
   // === Change diff ===
   if (previous && previous.hardwareHash !== hardwareHash && previous.signals) {
