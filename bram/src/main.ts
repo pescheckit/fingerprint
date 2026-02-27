@@ -174,8 +174,9 @@ async function displayResult() {
     animateCounter('headerStability', currentResult.stability, 0);
     animateCounter('headerModules', currentResult.modules.length, 0);
 
-    // Check for Tor detection
+    // Check for Tor and VPN detection
     displayTorDetection(currentResult);
+    displayVPNDetection(currentResult);
 
     // Display modules by category
     await displayModulesByCategory(currentResult);

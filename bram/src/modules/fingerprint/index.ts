@@ -22,3 +22,16 @@ export { SystemModule } from './system';
 // Proxy-resistant modules (Educational/Research)
 export { WebRTCLeakModule } from './webrtc-leak';
 export { NetworkTimingModule } from './network-timing';
+
+// Additional research modules
+export { FontsModule } from './fonts';
+export { SpeechSynthesisModule } from './speech-synthesis';
+export { WebGPUModule } from './webgpu';
+
+// Behavioral biometrics modules (Educational/Research)
+export { KeystrokeDynamicsModule } from './keystroke';
+export { MouseDynamicsModule } from './mouse-dynamics';
+
+// CPU and hardware detection modules (Educational/Research)
+export { WebAssemblyCPUModule } from './webassembly-cpu';
+export { GamepadModule } from './gamepad';

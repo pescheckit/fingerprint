@@ -32,7 +32,12 @@ import {
   PerformanceModule,
   SystemModule,
   WebRTCLeakModule,
-  NetworkTimingModule
+  NetworkTimingModule,
+  FontsModule,
+  SpeechSynthesisModule,
+  WebGPUModule,
+  KeystrokeDynamicsModule,
+  MouseDynamicsModule
 } from './modules/fingerprint';
 
 // Detection modules
@@ -70,6 +75,9 @@ export class DeviceThumbmark {
       new VPNDetectorModule(),        // VPN detection - 0 bits (detection only) 🆕
       new WebRTCLeakModule(),         // IP leak - 10 bits, 85% (proxy-resistant!) 🆕
       new NetworkTimingModule(),      // Network timing - 8 bits, 75% (proxy-resistant!) 🆕
+      new FontsModule(),              // Fonts - 7 bits, 92% (educational!) 🆕
+      new SpeechSynthesisModule(),    // Speech - 5 bits, 95% (educational!) 🆕
+      new WebGPUModule(),             // WebGPU - 18 bits, 90% (educational!) 🆕
       new WebGLModule(),              // GPU strings - 12 bits, 95% (spoofed on Tor)
       new WebGLRenderModule(),        // GPU rendering - 10 bits, 95% (randomized on Tor)
       new ScreenModule(),             // Exact dims - 8 bits, 95% (rounded on Tor)
@@ -79,7 +87,7 @@ export class DeviceThumbmark {
       new SystemModule()              // OS info - 4 bits, 90% (standardized on Tor)
     ];
     // TIER 1 = 27 bits (works on ALL browsers including Tor!)
-    // TIER 1+2 = 68 bits (only on normal browsers)
+    // TIER 1+2 = 86+ bits (only on normal browsers, includes WebGPU!)
   }
 
   /**
