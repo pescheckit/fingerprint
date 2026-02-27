@@ -244,6 +244,22 @@ body {
   margin-top: 0.75rem;
 }
 
+.server-match-info {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.75rem;
+}
+
+.match-label {
+  color: var(--text-muted);
+}
+
+.match-signals {
+  color: var(--accent-blue);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
 .copy-btn {
   display: inline-flex;
   align-items: center;

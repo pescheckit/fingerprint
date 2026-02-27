@@ -12,6 +12,9 @@ import { JSEngineCollector } from './src/collectors/tor/js-engine.js';
 import { CSSFeaturesCollector } from './src/collectors/tor/css-features.js';
 import { PerformanceProfileCollector } from './src/collectors/tor/performance-profile.js';
 import { FontMetricsCollector } from './src/collectors/tor/font-metrics.js';
+import { WebGPUCollector } from './src/collectors/webgpu.js';
+import { MediaCollector } from './src/collectors/media.js';
+import { IntlCollector } from './src/collectors/intl.js';
 import { FingerprintClient } from './src/client.js';
 
 const API_ENDPOINT = 'https://bingo-barry.nl/fingerprint';
@@ -284,6 +287,34 @@ function showLoading() {
 
 async function collectFingerprint() {
   const stopLoading = showLoading();
+  const client = new FingerprintClient(API_ENDPOINT);
+
+  // Try to recover visitor ID from server ETag before collecting
+  let serverVisitorId = null;
+  try {
+    serverVisitorId = await client.resolveEtag();
+  } catch {
+    // Server unavailable, continue without
+  }
+
+  // If server had our visitor ID, respawn it to local persistence
+  if (serverVisitorId) {
+    const { VisitorIdManager } = await import('./src/persistence/visitor-id-manager.js');
+    const manager = new VisitorIdManager();
+    // Write server's ID to all local mechanisms so fingerprinter picks it up
+    try {
+      const available = await Promise.all(
+        manager.mechanisms.map(async m => {
+          try { return (await m.isAvailable()) ? m : null; } catch { return null; }
+        })
+      );
+      await Promise.all(
+        available.filter(Boolean).map(m => m.write(serverVisitorId).catch(() => {}))
+      );
+    } catch {
+      // Best effort
+    }
+  }
 
   const fingerprinter = new Fingerprinter();
   fingerprinter
@@ -299,7 +330,10 @@ async function collectFingerprint() {
     .register(new JSEngineCollector())
     .register(new CSSFeaturesCollector())
     .register(new PerformanceProfileCollector())
-    .register(new FontMetricsCollector());
+    .register(new FontMetricsCollector())
+    .register(new WebGPUCollector())
+    .register(new MediaCollector())
+    .register(new IntlCollector());
 
   const startTime = performance.now();
   const result = await fingerprinter.collect();
@@ -420,18 +454,58 @@ async function collectFingerprint() {
   results.appendChild(hashCards);
 
   // Submit to server for probabilistic matching
-  const client = new FingerprintClient(API_ENDPOINT);
-  client.submit(result).then(serverResult => {
-    if (serverResult.matchedVisitorId) {
-      visitorReadable.textContent = 'Matched (confidence: ' + (serverResult.confidence * 100).toFixed(0) + '%)';
+  client.submit(result).then(async serverResult => {
+    // Store ETag for server-side persistence
+    const effectiveVisitorId = serverResult.matchedVisitorId || result.visitorId;
+    if (effectiveVisitorId) {
+      client.storeEtag(effectiveVisitorId).catch(() => {});
+    }
+
+    if (serverResult.matchedVisitorId && serverResult.matchedVisitorId !== result.visitorId) {
+      // Server matched us to an existing visitor (cross-device or post-clear)
+      // Adopt the server's visitor ID and respawn to all local storage
+      visitorHash.textContent = serverResult.matchedVisitorId;
+      visitorReadable.textContent = 'Server matched (' + (serverResult.confidence * 100).toFixed(0) + '%)';
       visitorReadable.style.color = 'var(--accent-green)';
+
+      // Respawn server's ID to all local persistence layers
+      try {
+        const { VisitorIdManager } = await import('./src/persistence/visitor-id-manager.js');
+        const manager = new VisitorIdManager();
+        const available = await Promise.all(
+          manager.mechanisms.map(async m => {
+            try { return (await m.isAvailable()) ? m : null; } catch { return null; }
+          })
+        );
+        await Promise.all(
+          available.filter(Boolean).map(m => m.write(serverResult.matchedVisitorId).catch(() => {}))
+        );
+      } catch {
+        // Best effort
+      }
+    } else if (serverResult.confidence > 0) {
+      // Same visitor ID confirmed by server
+      visitorReadable.textContent = 'Confirmed (' + (serverResult.confidence * 100).toFixed(0) + '%)';
+      visitorReadable.style.color = 'var(--accent-green)';
+    } else {
+      visitorReadable.textContent = 'New visitor';
     }
-    // Store ETag for persistence
-    if (result.visitorId) {
-      client.storeEtag(result.visitorId);
+
+    // Show server match details below the visitor ID card
+    const matchInfo = document.createElement('div');
+    matchInfo.className = 'server-match-info fade-in';
+    if (serverResult.matchedSignals && serverResult.matchedSignals.length > 0) {
+      matchInfo.innerHTML =
+        '<span class="match-label">Matched signals:</span> ' +
+        '<span class="match-signals">' + serverResult.matchedSignals.join(', ') + '</span>';
+    } else {
+      matchInfo.innerHTML = '<span class="match-label">No previous profile matched</span>';
     }
+    visitorCard.appendChild(matchInfo);
   }).catch(() => {
     // Server unavailable — visitor ID still works locally via persistence layer
+    visitorReadable.textContent = result.visitorId ? 'Local only (server offline)' : 'N/A';
+    visitorReadable.style.color = 'var(--text-secondary)';
   });
 
   // Device signal debug: show exactly what's being hashed
