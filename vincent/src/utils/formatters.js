@@ -2,7 +2,31 @@ export function formatValue(value) {
   if (value === true) return 'Yes'
   if (value === false) return 'No'
   if (value === null || value === undefined) return 'N/A'
-  if (typeof value === 'number') return value.toLocaleString()
+  if (typeof value === 'number') {
+    // Format small floats with precision, otherwise use locale
+    if (Math.abs(value) < 0.0001 && value !== 0) {
+      return value.toExponential(4)
+    }
+    if (!Number.isInteger(value) && Math.abs(value) < 1000) {
+      return value.toPrecision(6)
+    }
+    return value.toLocaleString()
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '(empty)'
+    if (value.length <= 3) return value.map(v => formatValue(v)).join(', ')
+    return `${value.slice(0, 3).map(v => formatValue(v)).join(', ')} (+${value.length - 3} more)`
+  }
+  if (typeof value === 'object') {
+    // Format objects as key: value pairs
+    const entries = Object.entries(value)
+    if (entries.length === 0) return '{}'
+    if (entries.length <= 3) {
+      return entries.map(([k, v]) => `${k}: ${formatValue(v)}`).join(', ')
+    }
+    const preview = entries.slice(0, 2).map(([k, v]) => `${k}: ${formatValue(v)}`).join(', ')
+    return `${preview} (+${entries.length - 2} more)`
+  }
   return String(value)
 }
 
