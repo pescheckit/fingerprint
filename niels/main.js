@@ -439,7 +439,7 @@ function buildDashboard(result, totalTime) {
   const okCount = result.signals.filter(s => !s.error).length;
   const errCount = result.signals.filter(s => s.error).length;
 
-  // === Topbar ===
+  // === Topbar (sticky) ===
   const topbar = document.createElement('header');
   topbar.className = 'topbar';
   topbar.innerHTML =
@@ -449,31 +449,22 @@ function buildDashboard(result, totalTime) {
       '<span class="topbar-stat"><span class="topbar-stat-value">' + totalTime.toFixed(0) + 'ms</span></span>' +
     '</div>';
 
-  // === Dashboard shell ===
-  const dashboard = document.createElement('div');
-  dashboard.className = 'dashboard';
-
-  // === Sidebar ===
-  const sidebar = document.createElement('aside');
-  sidebar.className = 'sidebar';
-
-  // Browser fingerprint card
-  const browserCard = createIdCard('browser', 'Browser Fingerprint', result.readableFingerprint, result.fingerprint);
-  sidebar.appendChild(browserCard.el);
-
-  // Device ID card
-  const deviceCard = createIdCard('device', 'Device ID', result.readableDeviceId || 'N/A', result.deviceId || 'N/A');
-  sidebar.appendChild(deviceCard.el);
-
-  // Visitor ID card
-  const visitorCard = createIdCard('visitor', 'Visitor ID', result.visitorId || 'N/A', result.visitorId || 'N/A');
-  sidebar.appendChild(visitorCard.el);
-
-  dashboard.appendChild(sidebar);
-
-  // === Main content ===
+  // === Single-column content ===
   const content = document.createElement('main');
   content.className = 'content';
+
+  // Identity strip — 3 cards in a row
+  const idStrip = document.createElement('div');
+  idStrip.className = 'id-strip';
+
+  const browserCard = createIdCard('browser', 'Browser Fingerprint', result.readableFingerprint, result.fingerprint);
+  const deviceCard = createIdCard('device', 'Device ID', result.readableDeviceId || 'N/A', result.deviceId || 'N/A');
+  const visitorCard = createIdCard('visitor', 'Visitor ID', result.visitorId || 'N/A', result.visitorId || 'N/A');
+
+  idStrip.appendChild(browserCard.el);
+  idStrip.appendChild(deviceCard.el);
+  idStrip.appendChild(visitorCard.el);
+  content.appendChild(idStrip);
 
   // Health bar
   const healthBar = document.createElement('div');
@@ -503,7 +494,7 @@ function buildDashboard(result, totalTime) {
   healthBar.appendChild(healthLabel);
   content.appendChild(healthBar);
 
-  // Device debug section
+  // Device debug
   const deviceDebug = buildDeviceDebug(result);
   if (deviceDebug) {
     deviceDebug.classList.add('cascade');
@@ -557,13 +548,9 @@ function buildDashboard(result, totalTime) {
   function switchTab(key) {
     if (key === activeTab) return;
     activeTab = key;
-
-    // Update tab states
     for (const [k, tabEl] of Object.entries(tabRefs)) {
       tabEl.classList.toggle('active', k === key);
     }
-
-    // Re-render grid
     renderGrid();
   }
 
@@ -577,7 +564,7 @@ function buildDashboard(result, totalTime) {
 
         const header = document.createElement('div');
         header.className = 'category-header cascade';
-        header.style.animationDelay = (0.25 + delay * 0.03) + 's';
+        header.style.animationDelay = (0.15 + delay * 0.025) + 's';
         header.style.color = 'var(' + cat.accent + ')';
         header.style.setProperty('--cat-color', 'var(' + cat.accent + ')');
         header.textContent = cat.label;
@@ -587,18 +574,17 @@ function buildDashboard(result, totalTime) {
         grouped[key].forEach(signal => {
           const card = renderSignalCard(signal, maxDuration);
           card.classList.add('cascade');
-          card.style.animationDelay = (0.25 + delay * 0.03) + 's';
+          card.style.animationDelay = (0.15 + delay * 0.025) + 's';
           grid.appendChild(card);
           delay++;
         });
       }
     } else {
-      const cat = CATEGORIES[activeTab];
       let delay = 0;
       grouped[activeTab].forEach(signal => {
         const card = renderSignalCard(signal, maxDuration);
         card.classList.add('cascade');
-        card.style.animationDelay = (0.05 + delay * 0.04) + 's';
+        card.style.animationDelay = (0.04 + delay * 0.035) + 's';
         grid.appendChild(card);
         delay++;
       });
@@ -609,24 +595,22 @@ function buildDashboard(result, totalTime) {
 
   content.appendChild(tabBar);
   content.appendChild(grid);
-  dashboard.appendChild(content);
 
   results.appendChild(topbar);
-  results.appendChild(dashboard);
+  results.appendChild(content);
 
-  // Animate sidebar cards in with stagger
-  sidebar.querySelectorAll('.id-card').forEach((card, i) => {
+  // Animate identity cards
+  idStrip.querySelectorAll('.id-card').forEach((card, i) => {
     card.classList.add('slide-in');
-    card.style.animationDelay = (0.1 + i * 0.12) + 's';
+    card.style.animationDelay = (0.05 + i * 0.08) + 's';
   });
 
   // Type-reveal hash values
-  typeReveal(browserCard.hashEl, result.readableFingerprint, 20);
-  typeReveal(deviceCard.hashEl, result.readableDeviceId || 'N/A', 20);
-  typeReveal(visitorCard.hashEl, result.visitorId || 'N/A', 18);
+  typeReveal(browserCard.hashEl, result.readableFingerprint, 18);
+  typeReveal(deviceCard.hashEl, result.readableDeviceId || 'N/A', 18);
+  typeReveal(visitorCard.hashEl, result.visitorId || 'N/A', 16);
 
-  // Return references for server update
-  return { visitorCard, sidebar };
+  return { visitorCard };
 }
 
 // --- Create identity card ---
