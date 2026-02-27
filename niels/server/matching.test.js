@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateMatchScore, findBestMatch } from './matching.js';
+import { calculateMatchScore, findBestMatch, calculateCrossDeviceScore, findBestCrossDeviceMatch, CROSS_DEVICE_WEIGHTS } from './matching.js';
 
 // Helper: a full stored profile row (as returned from SQLite)
 function makeStoredProfile(overrides = {}) {
@@ -237,5 +237,151 @@ describe('findBestMatch', () => {
 
     const result = findBestMatch(incoming, profiles);
     assert.equal(result.visitorId, 'perfect');
+  });
+});
+
+// Helper for cross-device stored profiles
+function makeCrossDeviceProfile(overrides = {}) {
+  return {
+    visitor_id: 'cross-device-visitor',
+    household_id: 'hh-abc',
+    local_ip_subnet: '192.168.1',
+    ip_subnet: '192.168.1',
+    timezone: 'Europe/Amsterdam',
+    languages: '["en","nl"]',
+    last_active: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    ...overrides,
+  };
+}
+
+function makeCrossDeviceIncoming(overrides = {}) {
+  return {
+    visitorId: 'incoming-visitor',
+    householdId: 'hh-abc',
+    localSubnet: '192.168.1',
+    ipSubnet: '192.168.1',
+    timezone: 'Europe/Amsterdam',
+    languages: '["en","nl"]',
+    ...overrides,
+  };
+}
+
+describe('calculateCrossDeviceScore', () => {
+  it('returns full score when all cross-device signals match', () => {
+    const incoming = makeCrossDeviceIncoming();
+    const stored = makeCrossDeviceProfile();
+    const { score, matchedSignals } = calculateCrossDeviceScore(incoming, stored);
+
+    // All weights sum to 1.0
+    const expectedMax = CROSS_DEVICE_WEIGHTS.household + CROSS_DEVICE_WEIGHTS.localSubnet +
+      CROSS_DEVICE_WEIGHTS.timezone + CROSS_DEVICE_WEIGHTS.languages +
+      CROSS_DEVICE_WEIGHTS.ipSubnet + CROSS_DEVICE_WEIGHTS.timingCorr;
+    assert.ok(Math.abs(score - expectedMax) < 0.001, `Expected score ~${expectedMax}, got ${score}`);
+    assert.ok(matchedSignals.includes('household'));
+    assert.ok(matchedSignals.includes('localSubnet'));
+    assert.ok(matchedSignals.includes('timezone'));
+    assert.ok(matchedSignals.includes('languages'));
+    assert.ok(matchedSignals.includes('ipSubnet'));
+    assert.ok(matchedSignals.includes('timingCorr'));
+  });
+
+  it('returns 0 when no signals match', () => {
+    const incoming = makeCrossDeviceIncoming({
+      householdId: 'different-hh',
+      localSubnet: '10.0.0',
+      ipSubnet: '10.0.0',
+      timezone: 'US/Pacific',
+      languages: '["zh"]',
+    });
+    const stored = makeCrossDeviceProfile({ last_active: null });
+    const { score, matchedSignals } = calculateCrossDeviceScore(incoming, stored);
+
+    assert.equal(score, 0);
+    assert.deepEqual(matchedSignals, []);
+  });
+
+  it('gives timing bonus for recently active profiles', () => {
+    const now = new Date();
+    const twoMinutesAgo = new Date(now - 2 * 60000).toISOString().replace('T', ' ').slice(0, 19);
+
+    const incoming = makeCrossDeviceIncoming({
+      householdId: null, localSubnet: null, ipSubnet: null,
+      timezone: null, languages: null,
+    });
+    const stored = makeCrossDeviceProfile({
+      household_id: null, local_ip_subnet: null, ip_subnet: null,
+      timezone: null, languages: null,
+      last_active: twoMinutesAgo,
+    });
+
+    const { score, matchedSignals } = calculateCrossDeviceScore(incoming, stored);
+    assert.ok(Math.abs(score - CROSS_DEVICE_WEIGHTS.timingCorr) < 0.001);
+    assert.ok(matchedSignals.includes('timingCorr'));
+  });
+
+  it('gives half timing bonus for 5-30 minute gap', () => {
+    const now = new Date();
+    const fifteenMinutesAgo = new Date(now - 15 * 60000).toISOString().replace('T', ' ').slice(0, 19);
+
+    const incoming = makeCrossDeviceIncoming({
+      householdId: null, localSubnet: null, ipSubnet: null,
+      timezone: null, languages: null,
+    });
+    const stored = makeCrossDeviceProfile({
+      household_id: null, local_ip_subnet: null, ip_subnet: null,
+      timezone: null, languages: null,
+      last_active: fifteenMinutesAgo,
+    });
+
+    const { score, matchedSignals } = calculateCrossDeviceScore(incoming, stored);
+    assert.ok(Math.abs(score - CROSS_DEVICE_WEIGHTS.timingCorr * 0.5) < 0.001);
+    assert.ok(matchedSignals.includes('timingCorr'));
+  });
+});
+
+describe('findBestCrossDeviceMatch', () => {
+  it('returns best match above threshold', () => {
+    const incoming = makeCrossDeviceIncoming();
+    const members = [
+      makeCrossDeviceProfile({ visitor_id: 'device-A' }),
+      makeCrossDeviceProfile({ visitor_id: 'device-B', timezone: 'US/Pacific' }),
+    ];
+
+    const result = findBestCrossDeviceMatch(incoming, members);
+    assert.ok(result !== null);
+    assert.equal(result.visitorId, 'device-A');
+    assert.ok(result.confidence >= 0.55);
+  });
+
+  it('skips profiles with same visitor ID', () => {
+    const incoming = makeCrossDeviceIncoming({ visitorId: 'same-visitor' });
+    const members = [
+      makeCrossDeviceProfile({ visitor_id: 'same-visitor' }),
+    ];
+
+    const result = findBestCrossDeviceMatch(incoming, members);
+    assert.equal(result, null);
+  });
+
+  it('returns null when below threshold', () => {
+    const incoming = makeCrossDeviceIncoming({
+      householdId: 'different',
+      localSubnet: '10.0.0',
+      timezone: 'US/Pacific',
+      languages: '["zh"]',
+      ipSubnet: '10.0.0',
+    });
+    const members = [
+      makeCrossDeviceProfile({ visitor_id: 'other-device', last_active: null }),
+    ];
+
+    const result = findBestCrossDeviceMatch(incoming, members);
+    assert.equal(result, null);
+  });
+
+  it('returns null for empty household', () => {
+    const incoming = makeCrossDeviceIncoming();
+    const result = findBestCrossDeviceMatch(incoming, []);
+    assert.equal(result, null);
   });
 });

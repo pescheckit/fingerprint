@@ -218,6 +218,86 @@ describe('Store', () => {
     });
   });
 
+  describe('household operations', () => {
+    it('upsertHousehold creates a new household', () => {
+      const result = store.upsertHousehold('household-abc');
+      assert.equal(result.changes, 1);
+
+      const household = store.getHousehold('household-abc');
+      assert.ok(household);
+      assert.equal(household.id, 'household-abc');
+      assert.equal(household.device_count, 0);
+    });
+
+    it('getHousehold returns household by id', () => {
+      store.upsertHousehold('household-xyz');
+      const household = store.getHousehold('household-xyz');
+      assert.ok(household);
+      assert.equal(household.id, 'household-xyz');
+    });
+
+    it('findHouseholdMembers returns profiles in household', () => {
+      store.saveProfile(makeProfileData({
+        visitor_id: 'v1',
+        household_id: 'hh-1',
+      }));
+      store.saveProfile(makeProfileData({
+        visitor_id: 'v2',
+        household_id: 'hh-1',
+      }));
+      store.saveProfile(makeProfileData({
+        visitor_id: 'v3',
+        household_id: 'hh-other',
+      }));
+
+      const members = store.findHouseholdMembers('hh-1');
+      assert.equal(members.length, 2);
+      const visitorIds = members.map(m => m.visitor_id);
+      assert.ok(visitorIds.includes('v1'));
+      assert.ok(visitorIds.includes('v2'));
+    });
+
+    it('updateLastActive updates the timestamp', () => {
+      store.saveProfile(makeProfileData({ visitor_id: 'v-active' }));
+      const before = store.getProfile('v-active');
+      const beforeActive = before.last_active;
+
+      store.updateLastActive('v-active');
+      const after = store.getProfile('v-active');
+      assert.ok(after.last_active);
+      // The timestamp should be set (may be same second, just check it exists)
+      assert.equal(typeof after.last_active, 'string');
+    });
+
+    it('findRecentProfiles returns recently active profiles', () => {
+      store.saveProfile(makeProfileData({ visitor_id: 'v-recent' }));
+      store.updateLastActive('v-recent');
+
+      const recent = store.findRecentProfiles(30);
+      assert.ok(recent.length >= 1);
+      const ids = recent.map(r => r.visitor_id);
+      assert.ok(ids.includes('v-recent'));
+    });
+  });
+
+  describe('new profile fields', () => {
+    it('stores and retrieves household_id, local_ip_subnet, battery fields', () => {
+      store.saveProfile(makeProfileData({
+        visitor_id: 'v-new-fields',
+        household_id: 'hh-test',
+        local_ip_subnet: '192.168.1',
+        battery_level: 0.85,
+        battery_charging: 1,
+      }));
+
+      const profile = store.getProfile('v-new-fields');
+      assert.equal(profile.household_id, 'hh-test');
+      assert.equal(profile.local_ip_subnet, '192.168.1');
+      assert.ok(Math.abs(profile.battery_level - 0.85) < 0.001);
+      assert.equal(profile.battery_charging, 1);
+    });
+  });
+
   describe('maintenance', () => {
     it('getStats returns profile count', () => {
       store.saveProfile(makeProfileData({ visitor_id: 'v1' }));

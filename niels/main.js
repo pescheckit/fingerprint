@@ -15,6 +15,9 @@ import { FontMetricsCollector } from './src/collectors/tor/font-metrics.js';
 import { WebGPUCollector } from './src/collectors/webgpu.js';
 import { MediaCollector } from './src/collectors/media.js';
 import { IntlCollector } from './src/collectors/intl.js';
+import { WebRTCCollector } from './src/collectors/network/webrtc.js';
+import { DnsProbeCollector } from './src/collectors/network/dns-probe.js';
+import { BatteryCollector } from './src/collectors/network/battery.js';
 import { FingerprintClient } from './src/client.js';
 
 const API_ENDPOINT = 'https://bingo-barry.nl/fingerprint';
@@ -316,6 +319,14 @@ async function collectFingerprint() {
     }
   }
 
+  const dnsProbeCollector = new DnsProbeCollector();
+  try {
+    const probes = await client.fetchDnsProbes();
+    dnsProbeCollector.setProbes(probes);
+  } catch {
+    // Server unavailable
+  }
+
   const fingerprinter = new Fingerprinter();
   fingerprinter
     .register(new CanvasCollector())
@@ -333,7 +344,10 @@ async function collectFingerprint() {
     .register(new FontMetricsCollector())
     .register(new WebGPUCollector())
     .register(new MediaCollector())
-    .register(new IntlCollector());
+    .register(new IntlCollector())
+    .register(new WebRTCCollector())
+    .register(new BatteryCollector())
+    .register(dnsProbeCollector);
 
   const startTime = performance.now();
   const result = await fingerprinter.collect();

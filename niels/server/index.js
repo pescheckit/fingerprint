@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
 import { Store } from './store.js';
-import { findBestMatch } from './matching.js';
+import { findBestMatch, findBestCrossDeviceMatch } from './matching.js';
 
 const app = express();
 const store = new Store();
@@ -58,20 +58,58 @@ app.post('/api/fingerprint', (req, res) => {
     const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
     const ipSubnet = ip.split('.').slice(0, 3).join('.');
 
-    const signals = { ...data, ip, ipSubnet };
+    // Compute household ID
+    const householdId = crypto.createHash('sha256')
+      .update(`${ipSubnet}|${data.timezone || ''}|${data.languages || ''}`)
+      .digest('hex');
+
+    const signals = {
+      ...data,
+      ip,
+      ipSubnet,
+      householdId,
+      localSubnet: data.localSubnet || null,
+      batteryLevel: data.batteryLevel ?? null,
+      batteryCharging: data.batteryCharging ?? null,
+    };
 
     // Find matches using indexed candidate search
     const profiles = store.findMatches(signals);
-    const match = findBestMatch(signals, profiles);
+    let match = findBestMatch(signals, profiles);
+
+    let matchType = null;
+    if (match) {
+      matchType = 'same-device';
+    } else {
+      // Try cross-device match within same household
+      const householdMembers = store.findHouseholdMembers(householdId);
+      const crossMatch = findBestCrossDeviceMatch(signals, householdMembers);
+      if (crossMatch) {
+        match = crossMatch;
+        matchType = 'cross-device';
+      }
+    }
 
     // Store the profile
     const visitorId = match ? match.visitorId : (data.visitorId || crypto.randomUUID());
-    store.saveProfile({ ...signals, visitor_id: visitorId });
+    store.saveProfile({
+      ...signals,
+      visitor_id: visitorId,
+      household_id: householdId,
+      local_ip_subnet: signals.localSubnet,
+      battery_level: signals.batteryLevel,
+      battery_charging: signals.batteryCharging,
+    });
+
+    // Upsert household and update last active timestamp
+    store.upsertHousehold(householdId);
+    store.updateLastActive(visitorId);
 
     res.json({
       matchedVisitorId: match ? match.visitorId : null,
       confidence: match ? match.confidence : 0,
       matchedSignals: match ? match.matchedSignals : [],
+      matchType,
       visitorId,
     });
   } catch (err) {
@@ -112,6 +150,20 @@ app.post('/api/etag-store', (req, res) => {
     res.json({ stored: true, etag });
   } catch (err) {
     console.error('POST /api/etag-store error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/dns-probes — generate DNS probe hostnames for recent visitors
+app.get('/api/dns-probes', (req, res) => {
+  try {
+    const recentProfiles = store.findRecentProfiles(30);
+    const probes = recentProfiles
+      .map(p => p.visitor_id.slice(0, 8) + '.fp.bingo-barry.nl')
+      .slice(0, 10);
+    res.json({ probes });
+  } catch (err) {
+    console.error('GET /api/dns-probes error:', err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

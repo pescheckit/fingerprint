@@ -107,6 +107,88 @@ export function calculateMatchScore(incoming, stored) {
   return { score, matchedSignals };
 }
 
+export const CROSS_DEVICE_WEIGHTS = {
+  household:   0.30,
+  localSubnet: 0.20,
+  timezone:    0.15,
+  languages:   0.15,
+  ipSubnet:    0.10,
+  timingCorr:  0.10,
+};
+
+export function calculateCrossDeviceScore(incoming, stored) {
+  let score = 0;
+  const matchedSignals = [];
+
+  // Household match
+  if (incoming.householdId && stored.household_id && incoming.householdId === stored.household_id) {
+    score += CROSS_DEVICE_WEIGHTS.household;
+    matchedSignals.push('household');
+  }
+
+  // Local subnet (from WebRTC)
+  if (incoming.localSubnet && stored.local_ip_subnet && incoming.localSubnet === stored.local_ip_subnet) {
+    score += CROSS_DEVICE_WEIGHTS.localSubnet;
+    matchedSignals.push('localSubnet');
+  }
+
+  // Timezone
+  if (incoming.timezone && stored.timezone && incoming.timezone === stored.timezone) {
+    score += CROSS_DEVICE_WEIGHTS.timezone;
+    matchedSignals.push('timezone');
+  }
+
+  // Languages
+  if (incoming.languages && stored.languages) {
+    const incomingLangs = typeof incoming.languages === 'string' ? incoming.languages : JSON.stringify(incoming.languages);
+    const storedLangs = typeof stored.languages === 'string' ? stored.languages : JSON.stringify(stored.languages);
+    if (incomingLangs === storedLangs) {
+      score += CROSS_DEVICE_WEIGHTS.languages;
+      matchedSignals.push('languages');
+    }
+  }
+
+  // IP subnet
+  if (incoming.ipSubnet && stored.ip_subnet && incoming.ipSubnet === stored.ip_subnet) {
+    score += CROSS_DEVICE_WEIGHTS.ipSubnet;
+    matchedSignals.push('ipSubnet');
+  }
+
+  // Timing correlation
+  if (stored.last_active) {
+    const lastActive = new Date(stored.last_active + 'Z');
+    const now = new Date();
+    const gapMinutes = (now - lastActive) / 60000;
+    if (gapMinutes < 5) {
+      score += CROSS_DEVICE_WEIGHTS.timingCorr;
+      matchedSignals.push('timingCorr');
+    } else if (gapMinutes < 30) {
+      score += CROSS_DEVICE_WEIGHTS.timingCorr * 0.5;
+      matchedSignals.push('timingCorr');
+    }
+  }
+
+  return { score, matchedSignals };
+}
+
+export function findBestCrossDeviceMatch(incoming, householdMembers, threshold = 0.55) {
+  let bestMatch = null;
+  let bestScore = 0;
+
+  for (const profile of householdMembers) {
+    // Skip profiles with the same visitor ID (we want cross-device, not same-device)
+    if (profile.visitor_id === incoming.visitorId) continue;
+
+    const { score, matchedSignals } = calculateCrossDeviceScore(incoming, profile);
+    if (score > bestScore && score >= threshold) {
+      bestScore = score;
+      bestMatch = { visitorId: profile.visitor_id, confidence: score, matchedSignals };
+    }
+  }
+
+  return bestMatch;
+}
+
 export function findBestMatch(incoming, profiles, threshold = 0.7) {
   let bestMatch = null;
   let bestScore = 0;

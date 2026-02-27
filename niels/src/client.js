@@ -45,6 +45,16 @@ export class FingerprintClient {
         data.colorDepth = signal.data.colorDepth;
         data.touchSupport = signal.data.touchSupport ? 1 : 0;
       }
+      if (signal.name === 'webrtc' && signal.data) {
+        data.localSubnet = signal.data.localSubnet;
+      }
+      if (signal.name === 'battery' && signal.data) {
+        data.batteryLevel = signal.data.level;
+        data.batteryCharging = signal.data.charging ? 1 : 0;
+      }
+      if (signal.name === 'dns-probe' && signal.data) {
+        data.dnsProbes = signal.data.probes;
+      }
     }
 
     return data;
@@ -62,6 +72,13 @@ export class FingerprintClient {
       return visitorId;
     }
     return null;
+  }
+
+  async fetchDnsProbes() {
+    const response = await fetch(`${this.endpoint}/api/dns-probes`);
+    if (!response.ok) return [];
+    const { probes } = await response.json();
+    return probes || [];
   }
 
   async storeEtag(visitorId) {

@@ -48,6 +48,29 @@ export class Store {
         updated_at TEXT DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_etags_visitor_id ON etags(visitor_id);
+
+      CREATE TABLE IF NOT EXISTS households (
+        id TEXT PRIMARY KEY,
+        first_seen TEXT DEFAULT (datetime('now')),
+        last_seen TEXT DEFAULT (datetime('now')),
+        device_count INTEGER DEFAULT 0
+      );
+    `);
+
+    // Add new columns to profiles (try/catch since SQLite has no IF NOT EXISTS for ALTER)
+    const newColumns = [
+      'ALTER TABLE profiles ADD COLUMN household_id TEXT',
+      'ALTER TABLE profiles ADD COLUMN local_ip_subnet TEXT',
+      "ALTER TABLE profiles ADD COLUMN last_active TEXT DEFAULT (datetime('now'))",
+      'ALTER TABLE profiles ADD COLUMN battery_level REAL',
+      'ALTER TABLE profiles ADD COLUMN battery_charging INTEGER',
+    ];
+    for (const sql of newColumns) {
+      try { this.db.exec(sql); } catch { /* column already exists */ }
+    }
+
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_profiles_household_id ON profiles(household_id);
     `);
   }
 
@@ -58,12 +81,14 @@ export class Store {
           visitor_id, fingerprint, device_id, ip, ip_subnet,
           audio_sum, timezone, timezone_offset, languages,
           screen_width, screen_height, hardware_concurrency,
-          device_memory, platform, touch_support, color_depth
+          device_memory, platform, touch_support, color_depth,
+          household_id, local_ip_subnet, battery_level, battery_charging
         ) VALUES (
           @visitor_id, @fingerprint, @device_id, @ip, @ip_subnet,
           @audio_sum, @timezone, @timezone_offset, @languages,
           @screen_width, @screen_height, @hardware_concurrency,
-          @device_memory, @platform, @touch_support, @color_depth
+          @device_memory, @platform, @touch_support, @color_depth,
+          @household_id, @local_ip_subnet, @battery_level, @battery_charging
         )
       `),
       getProfile: this.db.prepare(
@@ -107,6 +132,27 @@ export class Store {
       pruneEtags: this.db.prepare(
         "DELETE FROM etags WHERE updated_at < datetime('now', '-90 days')"
       ),
+
+      // Household operations
+      getHousehold: this.db.prepare('SELECT * FROM households WHERE id = ?'),
+      upsertHousehold: this.db.prepare(`
+        INSERT INTO households (id) VALUES (@id)
+        ON CONFLICT(id) DO UPDATE SET
+          last_seen = datetime('now'),
+          device_count = (SELECT COUNT(DISTINCT visitor_id) FROM profiles WHERE household_id = @id)
+      `),
+      findHouseholdMembers: this.db.prepare(
+        'SELECT * FROM profiles WHERE household_id = ? ORDER BY last_active DESC'
+      ),
+      updateLastActive: this.db.prepare(
+        "UPDATE profiles SET last_active = datetime('now') WHERE visitor_id = @visitor_id"
+      ),
+      findRecentProfiles: this.db.prepare(`
+        SELECT DISTINCT visitor_id FROM profiles
+        WHERE last_active > datetime('now', '-' || ? || ' minutes')
+        ORDER BY last_active DESC
+        LIMIT 20
+      `),
     };
   }
 
@@ -128,6 +174,10 @@ export class Store {
       platform: data.platform || null,
       touch_support: data.touchSupport ?? null,
       color_depth: data.colorDepth ?? null,
+      household_id: data.household_id || null,
+      local_ip_subnet: data.local_ip_subnet || null,
+      battery_level: data.battery_level ?? null,
+      battery_charging: data.battery_charging ?? null,
     });
   }
 
@@ -169,6 +219,10 @@ export class Store {
       platform: 'platform',
       touchSupport: 'touch_support',
       colorDepth: 'color_depth',
+      householdId: 'household_id',
+      localIpSubnet: 'local_ip_subnet',
+      batteryLevel: 'battery_level',
+      batteryCharging: 'battery_charging',
     };
 
     for (const [key, column] of Object.entries(fieldMap)) {
@@ -216,5 +270,26 @@ export class Store {
   getStats() {
     const { count } = this._stmts.profileCount.get();
     return { profileCount: count };
+  }
+
+  // Household operations
+  getHousehold(householdId) {
+    return this._stmts.getHousehold.get(householdId);
+  }
+
+  upsertHousehold(householdId) {
+    return this._stmts.upsertHousehold.run({ id: householdId });
+  }
+
+  findHouseholdMembers(householdId) {
+    return this._stmts.findHouseholdMembers.all(householdId);
+  }
+
+  updateLastActive(visitorId) {
+    return this._stmts.updateLastActive.run({ visitor_id: visitorId });
+  }
+
+  findRecentProfiles(minutes = 30) {
+    return this._stmts.findRecentProfiles.all(String(minutes));
   }
 }
