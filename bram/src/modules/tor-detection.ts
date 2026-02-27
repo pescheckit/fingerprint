@@ -81,18 +81,26 @@ export class TorDetectionModule implements ModuleInterface {
   }
 
   /**
-   * Check if navigator.hardwareConcurrency is fixed at 2
+   * Check if navigator.hardwareConcurrency is fixed (Tor spoof values)
    */
   private checkFixedCores(): boolean {
-    return navigator.hardwareConcurrency === 2;
+    const cores = navigator.hardwareConcurrency;
+    // Tor Browser 2026: spoofs as 2, 4, or 8 cores depending on version/settings
+    // Having exactly 2, 4, or 8 is suspicious (power of 2)
+    return cores === 2 || cores === 4 || cores === 8;
   }
 
   /**
-   * Check if navigator.deviceMemory is fixed at 2GB
+   * Check if navigator.deviceMemory is spoofed or missing (Tor behavior)
    */
   private checkFixedMemory(): boolean {
     const deviceMemory = (navigator as any).deviceMemory;
-    return deviceMemory === 2;
+    // Tor 2026: Often returns null/undefined or standardized values
+    return deviceMemory === null ||
+           deviceMemory === undefined ||
+           deviceMemory === 2 ||
+           deviceMemory === 4 ||
+           deviceMemory === 8;
   }
 
   /**
@@ -193,16 +201,30 @@ export class TorDetectionModule implements ModuleInterface {
 
       if (!gl) return true;
 
+      // Check both basic and unmasked values
       const vendor = gl.getParameter(gl.VENDOR);
       const renderer = gl.getParameter(gl.RENDERER);
 
-      // Tor returns generic values like "Google Inc." and "ANGLE (...)"
-      const isGenericVendor = vendor === 'Google Inc.' ||
-                             vendor === 'Mozilla' ||
-                             vendor.includes('Google');
-      const isGenericRenderer = renderer.includes('ANGLE') ||
-                               renderer.includes('Mesa') ||
-                               renderer.includes('Software');
+      // Also check UNMASKED values (Tor 2026 spoofs these as "Mozilla")
+      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+      let unmaskedVendor = vendor;
+      let unmaskedRenderer = renderer;
+
+      if (debugInfo) {
+        unmaskedVendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+        unmaskedRenderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+      }
+
+      // Tor 2026: Spoofs BOTH unmasked values as "Mozilla"
+      if (unmaskedVendor === 'Mozilla' && unmaskedRenderer === 'Mozilla') {
+        return true; // CRITICAL: This is Tor 2026 spoofing!
+      }
+
+      // Also check for other generic patterns
+      const isGenericVendor = vendor === 'Mozilla' || vendor.includes('Google Inc.');
+      const isGenericRenderer = renderer === 'Mozilla' ||
+                               renderer.includes('ANGLE') ||
+                               renderer.includes('Mesa');
 
       return isGenericVendor && isGenericRenderer;
     } catch {

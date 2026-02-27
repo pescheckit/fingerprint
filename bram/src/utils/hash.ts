@@ -1,8 +1,33 @@
 /**
- * MurmurHash3 implementation for consistent hashing
- * Based on: https://github.com/garycourt/murmurhash-js
+ * Enhanced hash functions for device fingerprinting
+ * Using SHA-256 for better collision resistance
  */
 
+/**
+ * SHA-256 hash (crypto-secure, collision-resistant)
+ */
+export async function sha256Hash(data: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const dataBuffer = encoder.encode(data);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  // Convert to hex (64 characters) - use first 16 for shorter IDs
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex.substring(0, 16); // 64 bits
+}
+
+/**
+ * Hash an object with SHA-256
+ */
+export async function hashObject(obj: any): Promise<string> {
+  // Stable stringify - sort keys for consistent hashing
+  const str = JSON.stringify(obj, Object.keys(obj).sort());
+  return await sha256Hash(str);
+}
+
+/**
+ * Synchronous MurmurHash3 (fallback for old browsers)
+ */
 export function murmurHash3(key: string, seed: number = 0): string {
   const remainder = key.length & 3;
   const bytes = key.length - remainder;
@@ -53,11 +78,13 @@ export function murmurHash3(key: string, seed: number = 0): string {
   h1 = ((((h1 & 0xffff) * 0xc2b2ae35) + ((((h1 >>> 16) * 0xc2b2ae35) & 0xffff) << 16))) & 0xffffffff;
   h1 ^= h1 >>> 16;
 
-  return (h1 >>> 0).toString(36);
+  return (h1 >>> 0).toString(16).padStart(8, '0'); // Hex instead of base36
 }
 
-export function hashObject(obj: any): string {
-  // Stable stringify - sort keys for consistent hashing
+/**
+ * Synchronous hash object (fallback)
+ */
+export function hashObjectSync(obj: any): string {
   const str = JSON.stringify(obj, Object.keys(obj).sort());
   return murmurHash3(str);
 }
