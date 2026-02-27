@@ -4,52 +4,278 @@ import { WebGLCollector } from './src/collectors/webgl.js';
 import { NavigatorCollector } from './src/collectors/navigator.js';
 import { ScreenCollector } from './src/collectors/screen.js';
 import { TimezoneCollector } from './src/collectors/timezone.js';
+import { AudioCollector } from './src/collectors/audio.js';
+import { FontCollector } from './src/collectors/fonts.js';
+import { MathCollector } from './src/collectors/math.js';
+import { StorageCollector } from './src/collectors/storage.js';
 
 const results = document.getElementById('results');
 
-function renderSignalGroup(signal) {
-  const group = document.createElement('div');
-  group.className = 'signal-group';
+const COPY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+const CHEVRON_ICON = '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
 
-  const header = document.createElement('h3');
-  header.textContent = `${signal.name} — ${signal.description}`;
+// Verbose signal groups that should be collapsed by default
+const COLLAPSED_BY_DEFAULT = ['webgl', 'fonts', 'math'];
+
+function isDataUrl(value) {
+  return typeof value === 'string' && value.startsWith('data:image/');
+}
+
+function isLongArray(value) {
+  return Array.isArray(value) && value.length > 5;
+}
+
+function isObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function copyToClipboard(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.innerHTML = CHECK_ICON + ' Copied';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.innerHTML = COPY_ICON + ' Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+function renderValue(key, value) {
+  const container = document.createElement('div');
+  container.style.display = 'contents';
+
+  // Canvas data URLs: render as images
+  if (isDataUrl(value)) {
+    const label = document.createElement('span');
+    label.className = 'signal-value';
+    label.textContent = 'Canvas image';
+
+    const img = document.createElement('img');
+    img.src = value;
+    img.className = 'canvas-preview';
+    img.alt = key + ' canvas render';
+
+    container.appendChild(label);
+    container.appendChild(img);
+    return container;
+  }
+
+  // Long arrays: show count with expandable list
+  if (isLongArray(value)) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'signal-value';
+
+    const summary = document.createElement('span');
+    summary.className = 'value-summary';
+    summary.textContent = value.length + ' items - show';
+
+    const expanded = document.createElement('div');
+    expanded.className = 'value-expanded';
+    expanded.textContent = value.join('\n');
+
+    summary.addEventListener('click', () => {
+      const isVisible = expanded.classList.toggle('visible');
+      summary.textContent = value.length + ' items - ' + (isVisible ? 'hide' : 'show');
+    });
+
+    wrapper.appendChild(summary);
+    wrapper.appendChild(expanded);
+    container.appendChild(wrapper);
+    return container;
+  }
+
+  // Nested objects: render as mini table
+  if (isObject(value)) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'signal-value';
+
+    const entries = Object.entries(value);
+
+    // Simple flat object: show inline
+    if (entries.length <= 4 && entries.every(([, v]) => typeof v !== 'object')) {
+      wrapper.textContent = entries.map(([k, v]) => k + ': ' + v).join(', ');
+      container.appendChild(wrapper);
+      return container;
+    }
+
+    // Nested or large object: collapsible
+    const summary = document.createElement('span');
+    summary.className = 'value-summary';
+    summary.textContent = entries.length + ' properties - show';
+
+    const expanded = document.createElement('div');
+    expanded.className = 'value-expanded';
+    expanded.textContent = JSON.stringify(value, null, 2);
+
+    summary.addEventListener('click', () => {
+      const isVisible = expanded.classList.toggle('visible');
+      summary.textContent = entries.length + ' properties - ' + (isVisible ? 'hide' : 'show');
+    });
+
+    wrapper.appendChild(summary);
+    wrapper.appendChild(expanded);
+    container.appendChild(wrapper);
+    return container;
+  }
+
+  // Simple values
+  const span = document.createElement('span');
+  span.className = 'signal-value';
+  span.textContent = String(value);
+  container.appendChild(span);
+  return container;
+}
+
+function renderSignalGroup(signal, index) {
+  const group = document.createElement('div');
+  group.className = 'signal-group fade-in fade-in-delay-' + Math.min(index + 3, 8);
+
+  const collapsed = COLLAPSED_BY_DEFAULT.includes(signal.name.toLowerCase());
+
+  if (!collapsed) {
+    group.classList.add('expanded');
+  }
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'signal-group-header';
+
+  const titleSection = document.createElement('div');
+  titleSection.className = 'signal-group-title';
+
+  const statusBadge = document.createElement('div');
+  statusBadge.className = 'signal-status-badge ' + (signal.error ? 'error' : 'success');
+
+  const h3 = document.createElement('h3');
+  h3.textContent = signal.name;
+
+  const desc = document.createElement('span');
+  desc.className = 'description';
+  desc.textContent = signal.description;
+
+  titleSection.appendChild(statusBadge);
+  titleSection.appendChild(h3);
+  titleSection.appendChild(desc);
+
+  const meta = document.createElement('div');
+  meta.className = 'signal-group-meta';
+
+  const duration = document.createElement('span');
+  duration.className = 'signal-duration';
+  duration.textContent = signal.duration.toFixed(1) + 'ms';
+
+  meta.appendChild(duration);
+  meta.insertAdjacentHTML('beforeend', CHEVRON_ICON);
+
+  header.appendChild(titleSection);
+  header.appendChild(meta);
+
+  header.addEventListener('click', () => {
+    group.classList.toggle('expanded');
+  });
+
   group.appendChild(header);
 
+  // Body
+  const body = document.createElement('div');
+  body.className = 'signal-group-body';
+
+  const content = document.createElement('div');
+  content.className = 'signal-group-content';
+
   if (signal.error) {
-    const errorRow = document.createElement('div');
-    errorRow.className = 'signal-row';
-    errorRow.innerHTML = `<span class="signal-label">Error</span><span class="signal-value" style="color:#f44">${signal.error}</span>`;
-    group.appendChild(errorRow);
-    return group;
-  }
-
-  const duration = document.createElement('div');
-  duration.className = 'signal-row';
-  duration.innerHTML = `<span class="signal-label">Collection time</span><span class="signal-value">${signal.duration.toFixed(2)}ms</span>`;
-  group.appendChild(duration);
-
-  for (const [key, value] of Object.entries(signal.data)) {
     const row = document.createElement('div');
     row.className = 'signal-row';
+    row.innerHTML = '<span class="signal-label">Error</span><span class="signal-value error-value">' + escapeHtml(signal.error) + '</span>';
+    content.appendChild(row);
+  } else if (signal.data) {
+    for (const [key, value] of Object.entries(signal.data)) {
+      const row = document.createElement('div');
+      row.className = 'signal-row';
 
-    const label = document.createElement('span');
-    label.className = 'signal-label';
-    label.textContent = key;
+      const label = document.createElement('span');
+      label.className = 'signal-label';
+      label.textContent = key;
+      row.appendChild(label);
 
-    const val = document.createElement('span');
-    val.className = 'signal-value';
-    val.textContent = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      const rendered = renderValue(key, value);
 
-    row.appendChild(label);
-    row.appendChild(val);
-    group.appendChild(row);
+      // If renderValue returned a container with an image, use a vertical layout
+      if (rendered.querySelector && rendered.querySelector('.canvas-preview')) {
+        row.style.flexDirection = 'column';
+        row.style.gap = '0.4rem';
+        const children = Array.from(rendered.childNodes);
+        children.forEach(child => row.appendChild(child));
+      } else {
+        const children = Array.from(rendered.childNodes);
+        children.forEach(child => row.appendChild(child));
+      }
+
+      content.appendChild(row);
+    }
   }
+
+  body.appendChild(content);
+  group.appendChild(body);
 
   return group;
 }
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function showLoading() {
+  const collectors = ['canvas', 'webgl', 'navigator', 'screen', 'timezone'];
+
+  results.innerHTML = '';
+
+  const container = document.createElement('div');
+  container.className = 'loading-container';
+
+  const spinner = document.createElement('div');
+  spinner.className = 'loading-spinner';
+
+  const text = document.createElement('div');
+  text.className = 'loading-text';
+  text.textContent = 'Collecting browser signals...';
+
+  const dots = document.createElement('div');
+  dots.className = 'loading-signals';
+
+  collectors.forEach(name => {
+    const dot = document.createElement('span');
+    dot.className = 'loading-signal-dot';
+    dot.textContent = name;
+    dot.dataset.collector = name;
+    dots.appendChild(dot);
+  });
+
+  container.appendChild(spinner);
+  container.appendChild(text);
+  container.appendChild(dots);
+  results.appendChild(container);
+
+  // Animate dots
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i < collectors.length) {
+      const dot = dots.querySelector('[data-collector="' + collectors[i] + '"]');
+      if (dot) dot.classList.add('active');
+      i++;
+    } else {
+      clearInterval(interval);
+    }
+  }, 200);
+
+  return () => clearInterval(interval);
+}
+
 async function collectFingerprint() {
-  results.innerHTML = '<p>Collecting signals...</p>';
+  const stopLoading = showLoading();
 
   const fingerprinter = new Fingerprinter();
   fingerprinter
@@ -57,38 +283,98 @@ async function collectFingerprint() {
     .register(new WebGLCollector())
     .register(new NavigatorCollector())
     .register(new ScreenCollector())
-    .register(new TimezoneCollector());
+    .register(new TimezoneCollector())
+    .register(new AudioCollector())
+    .register(new FontCollector())
+    .register(new MathCollector())
+    .register(new StorageCollector());
 
+  const startTime = performance.now();
   const result = await fingerprinter.collect();
+  const totalTime = performance.now() - startTime;
 
+  stopLoading();
   results.innerHTML = '';
 
-  const hashSection = document.createElement('div');
-  hashSection.className = 'hash-section';
+  // Header
+  const header = document.createElement('div');
+  header.className = 'dashboard-header fade-in';
+  header.innerHTML =
+    '<h1>Browser Fingerprint</h1>' +
+    '<div class="subtitle">Unique browser identification signals</div>' +
+    '<div class="total-time">Collected in ' + totalTime.toFixed(0) + 'ms</div>';
+  results.appendChild(header);
 
-  const hashLabel = document.createElement('h2');
-  hashLabel.textContent = 'Browser Fingerprint';
-  hashSection.appendChild(hashLabel);
+  // Hash cards
+  const hashCards = document.createElement('div');
+  hashCards.className = 'hash-cards fade-in fade-in-delay-1';
 
-  const hashEl = document.createElement('div');
-  hashEl.id = 'fingerprint-hash';
-  hashEl.textContent = result.hash;
-  hashSection.appendChild(hashEl);
+  // Browser hash card
+  const browserCard = document.createElement('div');
+  browserCard.className = 'hash-card browser';
 
-  const crossLabel = document.createElement('h2');
+  const browserLabel = document.createElement('div');
+  browserLabel.className = 'hash-card-label';
+  browserLabel.textContent = 'Browser Fingerprint';
+
+  const browserHash = document.createElement('div');
+  browserHash.id = 'fingerprint-hash';
+  browserHash.className = 'hash-card-value';
+  browserHash.textContent = result.hash;
+
+  const browserActions = document.createElement('div');
+  browserActions.className = 'hash-card-actions';
+
+  const browserCopy = document.createElement('button');
+  browserCopy.className = 'copy-btn';
+  browserCopy.innerHTML = COPY_ICON + ' Copy';
+  browserCopy.addEventListener('click', () => copyToClipboard(result.hash, browserCopy));
+
+  browserActions.appendChild(browserCopy);
+  browserCard.appendChild(browserLabel);
+  browserCard.appendChild(browserHash);
+  browserCard.appendChild(browserActions);
+
+  // Cross-browser hash card
+  const crossCard = document.createElement('div');
+  crossCard.className = 'hash-card cross-browser';
+
+  const crossLabel = document.createElement('div');
+  crossLabel.className = 'hash-card-label';
   crossLabel.textContent = 'Cross-Browser ID';
-  hashSection.appendChild(crossLabel);
 
-  const crossHashEl = document.createElement('div');
-  crossHashEl.id = 'cross-browser-hash';
-  crossHashEl.textContent = result.crossBrowserHash || 'N/A';
-  hashSection.appendChild(crossHashEl);
+  const crossHash = document.createElement('div');
+  crossHash.id = 'cross-browser-hash';
+  crossHash.className = 'hash-card-value';
+  crossHash.textContent = result.crossBrowserHash || 'N/A';
 
-  results.appendChild(hashSection);
+  const crossActions = document.createElement('div');
+  crossActions.className = 'hash-card-actions';
 
-  for (const signal of result.signals) {
-    results.appendChild(renderSignalGroup(signal));
-  }
+  const crossCopy = document.createElement('button');
+  crossCopy.className = 'copy-btn';
+  crossCopy.innerHTML = COPY_ICON + ' Copy';
+  crossCopy.addEventListener('click', () => copyToClipboard(result.crossBrowserHash || 'N/A', crossCopy));
+
+  crossActions.appendChild(crossCopy);
+  crossCard.appendChild(crossLabel);
+  crossCard.appendChild(crossHash);
+  crossCard.appendChild(crossActions);
+
+  hashCards.appendChild(browserCard);
+  hashCards.appendChild(crossCard);
+  results.appendChild(hashCards);
+
+  // Signals header
+  const signalsHeader = document.createElement('div');
+  signalsHeader.className = 'signals-header fade-in fade-in-delay-2';
+  signalsHeader.textContent = 'Signal Groups (' + result.signals.length + ')';
+  results.appendChild(signalsHeader);
+
+  // Signal groups
+  result.signals.forEach((signal, index) => {
+    results.appendChild(renderSignalGroup(signal, index));
+  });
 }
 
 collectFingerprint();

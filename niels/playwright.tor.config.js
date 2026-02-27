@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './e2e',
   testMatch: 'tor.spec.js',
   fullyParallel: false,
+  workers: 1,
   reporter: 'list',
   timeout: 120_000,
   expect: {
