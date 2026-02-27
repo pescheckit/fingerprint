@@ -778,10 +778,11 @@ async function collectFingerprint() {
 
   // Start background mouse observation, send update when done
   const effectiveVisitorIdRef = { value: result.visitorId };
+  const mouseSignal = result.signals.find(s => s.name === 'mouse');
+  const mousePassiveData = mouseSignal && mouseSignal.data ? mouseSignal.data : {};
   mouseCollector.observe(10000).then(mouseData => {
-    if (mouseData.scrollSampleCount > 0 || mouseData.moveSampleCount > 0) {
-      client.updateMouse(effectiveVisitorIdRef.value, mouseData).catch(() => {});
-    }
+    const merged = { ...mousePassiveData, ...mouseData };
+    client.updateMouse(effectiveVisitorIdRef.value, merged).catch(console.error);
     mouseCollector.destroy();
   });
 
