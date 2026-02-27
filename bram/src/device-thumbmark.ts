@@ -12,12 +12,14 @@ import { hashObject } from './utils/hash';
 import { safely, calculateTotalEntropy, calculateAverageStability, calculateConfidence } from './utils/helpers';
 import {
   WebGLModule,
+  WebGLRenderModule,
   CanvasModule,
   AudioModule,
   ScreenModule,
   HardwareModule,
   SystemModule,
-  ProtocolsModule
+  PerformanceModule,
+  TorDetectionModule
 } from './modules';
 
 export class DeviceThumbmark {
@@ -32,15 +34,19 @@ export class DeviceThumbmark {
       ...options
     };
 
-    // Initialize hardware modules (always safe, no dialogs)
+    // Initialize modules (optimized based on Tor compatibility research)
     this.allModules = [
-      new WebGLModule(),    // Most reliable - 12 bits, 95% stability
-      new ScreenModule(),   // Very stable - 8 bits, 95% stability
-      new CanvasModule(),   // Stable - 8 bits, 90% stability
-      new AudioModule(),    // Good - 6 bits, 85% stability
-      new HardwareModule(), // Excellent - 6 bits, 99% stability
-      new SystemModule()    // Good - 4 bits, 90% stability
+      new HardwareModule(),     // ⭐ MOST RELIABLE - CPU/RAM - 6 bits, 99% stability (works on Tor!)
+      new TorDetectionModule(), // Tor detection - 8 bits, 90% stability
+      new WebGLModule(),        // GPU info - 12 bits, 95% stability (blocked on Tor)
+      new WebGLRenderModule(),  // GPU rendering - 10 bits, 95% stability (randomized on Tor)
+      new ScreenModule(),       // Display - 8 bits, 95% stability (standardized on Tor)
+      new CanvasModule(),       // Canvas - 8 bits, 90% stability (randomized on Tor)
+      new AudioModule(),        // Audio - 6 bits, 85% stability (degraded on Tor)
+      new PerformanceModule(),  // CPU perf - 5 bits, 80% stability (coarsened on Tor)
+      new SystemModule()        // OS info - 4 bits, 90% stability (standardized on Tor)
     ];
+    // Removed: BatteryModule (deprecated), ProtocolsModule (blocked on Tor), MediaDevicesModule (unreliable)
   }
 
   /**

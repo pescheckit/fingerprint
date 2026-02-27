@@ -156,12 +156,25 @@ function setupEventListeners() {
     });
   }
 
-  // Test cross-browser button
-  const btnTest = document.getElementById('btnTest');
-  if (btnTest) {
-    btnTest.addEventListener('click', () => {
-      const instructions = thumbmark.getCrossBrowserTestInstructions();
-      alert(instructions);
+  // Export results button
+  const btnExport = document.getElementById('btnExport');
+  if (btnExport) {
+    btnExport.addEventListener('click', () => {
+      if (!currentResult) return;
+
+      // Create JSON blob
+      const json = JSON.stringify(currentResult, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      // Download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `devicecreep-${currentResult.deviceId}-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     });
   }
 }
