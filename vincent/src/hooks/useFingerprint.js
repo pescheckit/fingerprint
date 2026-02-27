@@ -224,6 +224,15 @@ export function useCustomSignals() {
         collected.ipInfo = { supported: false, error: e.message }
       }
 
+      // Browsing Context (referrer, history length, navigation type)
+      collected.browsingContext = getBrowsingContext()
+
+      // Navigation Timing (page load performance data)
+      collected.navigationTiming = getNavigationTiming()
+
+      // Performance Resources (loaded resources on this page)
+      collected.performanceResources = getPerformanceResources()
+
       // Generate device fingerprint from cross-browser stable signals
       const deviceFp = generateDeviceFingerprint(collected)
       setDeviceFingerprint(deviceFp)
@@ -876,6 +885,196 @@ async function getIPFingerprint(webrtcData) {
   return result
 }
 
+// Browsing Context - referrer, history length, navigation type
+function getBrowsingContext() {
+  const context = {
+    // Document referrer (where user came from)
+    referrer: document.referrer || null,
+    referrerDomain: null,
+    isExternalReferrer: false,
+
+    // History information
+    historyLength: history.length,
+
+    // Current page info
+    currentURL: window.location.href,
+    currentOrigin: window.location.origin,
+    currentPath: window.location.pathname,
+    currentSearch: window.location.search || null,
+    currentHash: window.location.hash || null,
+
+    // Navigation type
+    navigationType: null,
+    redirectCount: 0,
+
+    // Document state
+    documentState: document.readyState,
+    visibilityState: document.visibilityState,
+    hidden: document.hidden,
+
+    // Opener (if opened via window.open)
+    hasOpener: !!window.opener,
+
+    // Ancestor origins (for iframes)
+    isInIframe: window.self !== window.top,
+    ancestorOrigins: [],
+  }
+
+  // Parse referrer domain
+  if (context.referrer) {
+    try {
+      const refURL = new URL(context.referrer)
+      context.referrerDomain = refURL.hostname
+      context.isExternalReferrer = refURL.origin !== window.location.origin
+    } catch {
+      // Invalid URL
+    }
+  }
+
+  // Get navigation type from Performance API
+  if (performance.getEntriesByType) {
+    const navEntries = performance.getEntriesByType('navigation')
+    if (navEntries.length > 0) {
+      const nav = navEntries[0]
+      context.navigationType = nav.type // 'navigate', 'reload', 'back_forward', 'prerender'
+      context.redirectCount = nav.redirectCount
+    }
+  }
+
+  // Get ancestor origins (for cross-origin iframe detection)
+  if (window.location.ancestorOrigins) {
+    context.ancestorOrigins = Array.from(window.location.ancestorOrigins)
+  }
+
+  return context
+}
+
+// Navigation Timing - detailed page load performance metrics
+function getNavigationTiming() {
+  if (!performance.getEntriesByType) {
+    return { supported: false }
+  }
+
+  const navEntries = performance.getEntriesByType('navigation')
+  if (navEntries.length === 0) {
+    return { supported: false }
+  }
+
+  const nav = navEntries[0]
+
+  return {
+    supported: true,
+    // Navigation type
+    type: nav.type,
+    redirectCount: nav.redirectCount,
+
+    // Timing metrics (in ms)
+    timing: {
+      // DNS
+      dnsLookup: Math.round(nav.domainLookupEnd - nav.domainLookupStart),
+      // TCP connection
+      tcpConnect: Math.round(nav.connectEnd - nav.connectStart),
+      // SSL/TLS
+      sslHandshake: nav.secureConnectionStart > 0
+        ? Math.round(nav.connectEnd - nav.secureConnectionStart)
+        : 0,
+      // Request/Response
+      requestTime: Math.round(nav.responseStart - nav.requestStart),
+      responseTime: Math.round(nav.responseEnd - nav.responseStart),
+      // DOM processing
+      domInteractive: Math.round(nav.domInteractive - nav.responseEnd),
+      domComplete: Math.round(nav.domComplete - nav.responseEnd),
+      // Total load time
+      loadComplete: Math.round(nav.loadEventEnd - nav.startTime),
+      // Time to first byte
+      ttfb: Math.round(nav.responseStart - nav.requestStart),
+    },
+
+    // Transfer sizes
+    transfer: {
+      encodedBodySize: nav.encodedBodySize,
+      decodedBodySize: nav.decodedBodySize,
+      transferSize: nav.transferSize,
+    },
+
+    // Protocol info
+    protocol: nav.nextHopProtocol,
+
+    // Cache status (transferSize = 0 means from cache)
+    fromCache: nav.transferSize === 0 && nav.decodedBodySize > 0,
+  }
+}
+
+// Performance Resources - all resources loaded on this page
+function getPerformanceResources() {
+  if (!performance.getEntriesByType) {
+    return { supported: false }
+  }
+
+  const resources = performance.getEntriesByType('resource')
+
+  // Group by type
+  const byType = {}
+  const externalDomains = new Set()
+  let totalTransferSize = 0
+  let totalDecodedSize = 0
+
+  const resourceList = resources.map((r) => {
+    // Determine resource type
+    let type = r.initiatorType
+    if (r.name.includes('.js')) type = 'script'
+    else if (r.name.includes('.css')) type = 'stylesheet'
+    else if (r.name.match(/\.(png|jpg|jpeg|gif|svg|webp|ico)/i)) type = 'image'
+    else if (r.name.match(/\.(woff|woff2|ttf|otf|eot)/i)) type = 'font'
+
+    // Count by type
+    byType[type] = (byType[type] || 0) + 1
+
+    // Track external domains
+    try {
+      const url = new URL(r.name)
+      if (url.origin !== window.location.origin) {
+        externalDomains.add(url.hostname)
+      }
+    } catch {
+      // Invalid URL
+    }
+
+    // Sum sizes
+    totalTransferSize += r.transferSize || 0
+    totalDecodedSize += r.decodedBodySize || 0
+
+    return {
+      name: r.name.length > 100 ? '...' + r.name.slice(-80) : r.name,
+      type,
+      duration: Math.round(r.duration),
+      transferSize: r.transferSize,
+      decodedSize: r.decodedBodySize,
+      protocol: r.nextHopProtocol,
+      fromCache: r.transferSize === 0 && r.decodedBodySize > 0,
+    }
+  })
+
+  // Sort by duration (slowest first)
+  resourceList.sort((a, b) => b.duration - a.duration)
+
+  return {
+    supported: true,
+    totalCount: resources.length,
+    byType,
+    externalDomains: Array.from(externalDomains),
+    externalDomainCount: externalDomains.size,
+    totalTransferSize,
+    totalTransferSizeKB: (totalTransferSize / 1024).toFixed(1),
+    totalDecodedSize,
+    totalDecodedSizeKB: (totalDecodedSize / 1024).toFixed(1),
+    // Top 10 slowest resources
+    slowestResources: resourceList.slice(0, 10),
+    // All resources (for detailed view)
+    allResources: resourceList,
+  }
+}
+
 // Cookie tracking - get all cookies for current domain
 function getCookiesFingerprint() {
   const cookieString = document.cookie
@@ -1110,4 +1309,250 @@ function tryParseJSON(str) {
   } catch {
     return null
   }
+}
+
+// IndexedDB tracking
+async function getIndexedDBFingerprint() {
+  if (!window.indexedDB) {
+    return { supported: false }
+  }
+
+  const databases = []
+  let totalRecords = 0
+  let totalSize = 0
+
+  try {
+    // Get list of all databases (modern browsers)
+    if (indexedDB.databases) {
+      const dbList = await indexedDB.databases()
+
+      for (const dbInfo of dbList) {
+        const dbData = await analyzeDatabase(dbInfo.name, dbInfo.version)
+        if (dbData) {
+          databases.push(dbData)
+          totalRecords += dbData.totalRecords
+          totalSize += dbData.estimatedSize
+        }
+      }
+    } else {
+      // Fallback: try common database names
+      const commonNames = [
+        'fingerprint_history',
+        'localforage',
+        'keyval-store',
+        'firebaseLocalStorageDb',
+        '__sentry__',
+      ]
+
+      for (const name of commonNames) {
+        try {
+          const dbData = await analyzeDatabase(name)
+          if (dbData) {
+            databases.push(dbData)
+            totalRecords += dbData.totalRecords
+            totalSize += dbData.estimatedSize
+          }
+        } catch {
+          // Database doesn't exist, skip
+        }
+      }
+    }
+
+    return {
+      supported: true,
+      count: databases.length,
+      databases,
+      totalRecords,
+      totalSizeKB: (totalSize / 1024).toFixed(2),
+    }
+  } catch (e) {
+    return { supported: false, error: e.message }
+  }
+}
+
+// Analyze a single IndexedDB database
+async function analyzeDatabase(name, version) {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open(name)
+
+      request.onerror = () => {
+        resolve(null)
+      }
+
+      request.onsuccess = async (event) => {
+        const db = event.target.result
+        const objectStoreNames = Array.from(db.objectStoreNames)
+
+        const stores = []
+        let totalRecords = 0
+        let estimatedSize = 0
+
+        // Analyze each object store
+        for (const storeName of objectStoreNames) {
+          try {
+            const storeData = await analyzeObjectStore(db, storeName)
+            stores.push(storeData)
+            totalRecords += storeData.count
+            estimatedSize += storeData.estimatedSize
+          } catch {
+            stores.push({
+              name: storeName,
+              count: 0,
+              error: 'Could not read store',
+            })
+          }
+        }
+
+        db.close()
+
+        resolve({
+          name,
+          version: db.version,
+          storeCount: objectStoreNames.length,
+          stores,
+          totalRecords,
+          estimatedSize,
+          type: detectDatabaseType(name),
+        })
+      }
+
+      // Handle upgrade needed (database exists but version mismatch)
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result
+        db.close()
+        resolve({
+          name,
+          version: version || 'unknown',
+          storeCount: 0,
+          stores: [],
+          totalRecords: 0,
+          estimatedSize: 0,
+          note: 'Version mismatch - could not fully analyze',
+          type: detectDatabaseType(name),
+        })
+      }
+
+      // Timeout fallback
+      setTimeout(() => resolve(null), 2000)
+    } catch {
+      resolve(null)
+    }
+  })
+}
+
+// Analyze a single object store
+function analyzeObjectStore(db, storeName) {
+  return new Promise((resolve, reject) => {
+    try {
+      const transaction = db.transaction(storeName, 'readonly')
+      const store = transaction.objectStore(storeName)
+      const countRequest = store.count()
+
+      let records = []
+      let estimatedSize = 0
+
+      countRequest.onsuccess = () => {
+        const count = countRequest.result
+
+        // Only get sample records if count is reasonable
+        if (count > 0 && count <= 100) {
+          const getAllRequest = store.getAll()
+          getAllRequest.onsuccess = () => {
+            records = getAllRequest.result.slice(0, 10).map((record) => {
+              const str = JSON.stringify(record)
+              estimatedSize += str.length
+              return {
+                preview: str.length > 100 ? str.substring(0, 100) + '...' : str,
+                size: str.length,
+              }
+            })
+
+            // Estimate total size based on sample
+            if (count > 10) {
+              const avgSize = estimatedSize / records.length
+              estimatedSize = avgSize * count
+            }
+
+            resolve({
+              name: storeName,
+              count,
+              keyPath: store.keyPath,
+              autoIncrement: store.autoIncrement,
+              indexes: Array.from(store.indexNames),
+              sampleRecords: records,
+              estimatedSize: Math.round(estimatedSize),
+            })
+          }
+          getAllRequest.onerror = () => {
+            resolve({
+              name: storeName,
+              count,
+              keyPath: store.keyPath,
+              autoIncrement: store.autoIncrement,
+              indexes: Array.from(store.indexNames),
+              estimatedSize: 0,
+            })
+          }
+        } else if (count > 100) {
+          // Too many records, just get count and estimate
+          const cursorRequest = store.openCursor()
+          let sampleCount = 0
+
+          cursorRequest.onsuccess = (event) => {
+            const cursor = event.target.result
+            if (cursor && sampleCount < 5) {
+              const str = JSON.stringify(cursor.value)
+              estimatedSize += str.length
+              sampleCount++
+              cursor.continue()
+            } else {
+              const avgSize = sampleCount > 0 ? estimatedSize / sampleCount : 100
+              resolve({
+                name: storeName,
+                count,
+                keyPath: store.keyPath,
+                autoIncrement: store.autoIncrement,
+                indexes: Array.from(store.indexNames),
+                estimatedSize: Math.round(avgSize * count),
+                note: `${count} records (sampled ${sampleCount})`,
+              })
+            }
+          }
+        } else {
+          resolve({
+            name: storeName,
+            count: 0,
+            keyPath: store.keyPath,
+            autoIncrement: store.autoIncrement,
+            indexes: Array.from(store.indexNames),
+            estimatedSize: 0,
+          })
+        }
+      }
+
+      countRequest.onerror = () => {
+        reject(new Error('Could not count records'))
+      }
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
+
+// Detect database type based on name
+function detectDatabaseType(name) {
+  const nameLower = name.toLowerCase()
+
+  if (nameLower.includes('firebase')) return 'firebase'
+  if (nameLower.includes('localforage')) return 'localforage'
+  if (nameLower.includes('sentry')) return 'sentry'
+  if (nameLower.includes('workbox') || nameLower.includes('sw-')) return 'service-worker'
+  if (nameLower.includes('cache')) return 'cache'
+  if (nameLower.includes('fingerprint') || nameLower.includes('visitor')) return 'fingerprint'
+  if (nameLower.includes('keyval')) return 'key-value'
+  if (nameLower.includes('auth') || nameLower.includes('user')) return 'auth'
+  if (nameLower.includes('analytics')) return 'analytics'
+
+  return 'other'
 }

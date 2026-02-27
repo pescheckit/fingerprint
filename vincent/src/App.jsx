@@ -31,11 +31,36 @@ function App() {
   const { stats, loading: statsLoading } = useGlobalStats()
   const { openPages, currentTabId } = useOpenPages()
   const { pages: trackedPages, loading: pagesLoading, useLocalStorage: pagesLocal } = usePageTracking(fingerprint)
-  const [expandedSections, setExpandedSections] = useState({})
+  const [expandedSections, setExpandedSections] = useState({
+    // Storage sections expanded by default to show all data
+    cookies: true,
+    localStorage: true,
+    sessionStorage: true,
+    indexedDB: true,
+  })
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem('fingerprint-active-tab')
     return saved || 'overview'
   })
+  const [userName, setUserName] = useState(() => {
+    return localStorage.getItem('fingerprint-user-name') || ''
+  })
+  const [namePromptDismissed, setNamePromptDismissed] = useState(false)
+
+  const showNamePrompt = !historyLoading && !fpLoading && !userName && !isReturningVisitor && !namePromptDismissed
+
+  const saveUserName = (name) => {
+    const trimmedName = name.trim()
+    if (trimmedName) {
+      localStorage.setItem('fingerprint-user-name', trimmedName)
+      setUserName(trimmedName)
+    }
+    setNamePromptDismissed(true)
+  }
+
+  const dismissNamePrompt = () => {
+    setNamePromptDismissed(true)
+  }
 
   useEffect(() => {
     localStorage.setItem('fingerprint-active-tab', activeTab)
@@ -69,12 +94,17 @@ function App() {
           </div>
         )}
 
+        {showNamePrompt && (
+          <NamePrompt onSave={saveUserName} onSkip={dismissNamePrompt} />
+        )}
+
         {!isLoading && !historyError && (
           <VisitorBanner
             isReturningVisitor={isReturningVisitor}
             visitCount={visitCount}
             comparison={comparison}
             useLocalStorage={useLocalStorage}
+            userName={userName}
           />
         )}
 
@@ -166,14 +196,14 @@ function App() {
   )
 }
 
-function VisitorBanner({ isReturningVisitor, visitCount, comparison, useLocalStorage }) {
+function VisitorBanner({ isReturningVisitor, visitCount, comparison, useLocalStorage, userName }) {
   return (
     <div className={`visitor-banner ${isReturningVisitor ? 'returning' : 'new'}`}>
       {isReturningVisitor ? (
         <>
           <span className="visitor-icon">👋</span>
           <div className="visitor-info">
-            <strong>Welcome back!</strong>
+            <strong>Welcome back{userName ? `, ${userName}` : ''}!</strong>
             <span>Visit #{visitCount} • Fingerprint {comparison?.fingerprintMatch ? 'matches' : 'changed'}</span>
           </div>
           {comparison?.fingerprintMatch ? (
@@ -186,12 +216,47 @@ function VisitorBanner({ isReturningVisitor, visitCount, comparison, useLocalSto
         <>
           <span className="visitor-icon">✨</span>
           <div className="visitor-info">
-            <strong>First visit detected</strong>
+            <strong>{userName ? `Hello, ${userName}!` : 'First visit detected'}</strong>
             <span>Your fingerprint has been stored {useLocalStorage ? 'locally' : 'in the database'}</span>
           </div>
           <span className="match-badge new">NEW</span>
         </>
       )}
+    </div>
+  )
+}
+
+function NamePrompt({ onSave, onSkip }) {
+  const [name, setName] = useState('')
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSave(name)
+  }
+
+  return (
+    <div className="name-prompt-overlay">
+      <div className="name-prompt">
+        <h3>Welcome!</h3>
+        <p>What should we call you?</p>
+        <form onSubmit={handleSubmit}>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Enter your name"
+            autoFocus
+          />
+          <div className="name-prompt-buttons">
+            <button type="submit" className="save-btn" disabled={!name.trim()}>
+              Save
+            </button>
+            <button type="button" className="skip-btn" onClick={onSkip}>
+              Skip
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
