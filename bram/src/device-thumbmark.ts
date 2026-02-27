@@ -81,6 +81,8 @@ export class DeviceThumbmark {
       new NetworkTimingModule(),      // Network timing - 8 bits, 75% (proxy-resistant!) 🆕
       new FontsModule(),              // Fonts - 7 bits, 92% (educational!) 🆕
       new SpeechSynthesisModule(),    // Speech - 5 bits, 95% (educational!) 🆕
+      new ExtensionsModule(),         // Extensions - 10 bits, 80% (educational!) 🆕
+      new OffscreenCanvasModule(),    // Offscreen Canvas - 8 bits, 88% (educational!) 🆕
       new WebGPUModule(),             // WebGPU - 18 bits, 90% (educational!) 🆕
       new KeystrokeDynamicsModule(),  // Keystroke - 8 bits, 70% (behavioral!) 🆕
       new MouseDynamicsModule(),      // Mouse - 8 bits, 70% (behavioral!) 🆕
@@ -95,7 +97,7 @@ export class DeviceThumbmark {
       new SystemModule()              // OS info - 4 bits, 90% (standardized on Tor)
     ];
     // TIER 1 = 27 bits (works on ALL browsers including Tor!)
-    // TIER 1+2 = 118+ bits (only on normal browsers, includes WebGPU + behavioral + hardware detection!)
+    // TIER 1+2 = 136+ bits (only on normal browsers, includes WebGPU + behavioral + hardware + extensions detection!)
   }
 
   /**
