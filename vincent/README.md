@@ -140,6 +140,79 @@ Combines multiple sources to collect IP information:
 - Gathers ICE candidates to extract local network IPs
 - Can reveal private network addresses (192.168.x.x, 10.x.x.x, etc.)
 
+### 19. Client Hints API
+High-entropy device information via `navigator.userAgentData.getHighEntropyValues()`:
+- **Architecture**: CPU architecture (x86, arm)
+- **Bitness**: 32-bit or 64-bit
+- **Model**: Device model name
+- **Platform Version**: Exact OS version
+- **WOW64**: Windows 32-on-64 emulation
+- **Form Factor**: Device form factor
+
+### 20. Enhanced WebGL Parameters
+Complete GPU capability fingerprint:
+- All texture size limits (max texture, cube map, renderbuffer)
+- Vertex shader limits (attribs, uniform vectors, varying vectors)
+- Fragment shader limits
+- Viewport dimensions and line/point size ranges
+- Color/depth/stencil bit depths
+- Full extensions list
+- **Shader Precision Formats**: Precision for float/int in vertex/fragment shaders
+
+### 21. Device Sensors (Generic Sensor API)
+Detects available hardware sensors:
+- **Accelerometer**: Motion detection
+- **Gyroscope**: Angular velocity
+- **Magnetometer**: Compass/magnetic field
+- **Absolute/Relative Orientation**: Device orientation
+- **Ambient Light Sensor**: Light level
+- **Linear Acceleration**: Acceleration without gravity
+- **Gravity Sensor**: Gravity vector
+- DeviceMotion/DeviceOrientation event support
+- Permission requirements detection
+
+### 22. Gamepad API
+Connected game controllers:
+- Controller ID and mapping type
+- Number of axes and buttons
+- Vibration actuator support
+- Connection timestamps
+
+### 23. Media Capabilities API
+Hardware codec support detection:
+- **Video Codecs**: H.264, H.265/HEVC, VP8, VP9, AV1
+- **Audio Codecs**: AAC, Opus, Vorbis, FLAC, MP3
+- Per-codec: supported, smooth playback, power efficient (hardware accelerated)
+
+### 24. Extended Screen Properties
+Advanced display information:
+- Window outer/inner dimensions
+- Window screen position
+- Orientation type and angle
+- Multi-monitor detection (`screen.isExtended`)
+- Visual viewport scale and offset
+- CSS preferences: color scheme, reduced motion, contrast, forced colors
+- HDR support (`dynamic-range: high`)
+- Pointer type (fine/coarse) and hover capability
+- Display mode (browser, standalone, fullscreen)
+
+### 25. Performance Memory
+JavaScript heap and system memory:
+- JS heap size limit
+- Total/used JS heap size
+- Device memory (RAM in GB)
+- Hardware concurrency (CPU cores)
+- `performance.now()` precision (varies by browser/OS)
+
+### 26. Permissions API
+Permission states for hardware access:
+- Geolocation, camera, microphone
+- Notifications, clipboard access
+- Bluetooth, NFC, USB
+- Sensors (accelerometer, gyroscope, magnetometer, ambient light)
+- Screen wake lock, display capture
+- Count of granted/denied/prompt permissions
+
 ## Cross-Browser Device Fingerprint
 
 The project generates a stable device fingerprint using only signals that are consistent across different browsers on the same device:
@@ -156,9 +229,15 @@ The project generates a stable device fingerprint using only signals that are co
 | Language | Yes |
 | Public IP | Yes |
 | Local IPs (WebRTC) | Yes |
+| Architecture/Bitness | Yes |
+| Device Memory | Yes |
+| WebGL max texture size | Yes |
+| Media codec support | Yes |
+| Sensor availability | Yes |
 | Canvas/WebGL hash | No (varies by engine) |
 | Audio fingerprint | No (varies by engine) |
 | Math fingerprint | No (varies by engine) |
+| Shader precision | No (varies by driver) |
 
 ## Tech Stack
 

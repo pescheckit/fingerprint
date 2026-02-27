@@ -233,6 +233,50 @@ export function useCustomSignals() {
       // Performance Resources (loaded resources on this page)
       collected.performanceResources = getPerformanceResources()
 
+      // Client Hints API (high entropy device info)
+      try {
+        collected.clientHints = await getClientHintsFingerprint()
+      } catch (e) {
+        collected.clientHints = { supported: false, error: e.message }
+      }
+
+      // Enhanced WebGL parameters (full GPU capability fingerprint)
+      try {
+        collected.webglParams = getWebGLParametersFingerprint()
+      } catch (e) {
+        collected.webglParams = { supported: false, error: e.message }
+      }
+
+      // Device Sensors (accelerometer, gyroscope, etc.)
+      try {
+        collected.deviceSensors = await getDeviceSensorsFingerprint()
+      } catch (e) {
+        collected.deviceSensors = { supported: false, error: e.message }
+      }
+
+      // Gamepad API
+      collected.gamepads = getGamepadFingerprint()
+
+      // Media Capabilities (hardware codec support)
+      try {
+        collected.mediaCapabilities = await getMediaCapabilitiesFingerprint()
+      } catch (e) {
+        collected.mediaCapabilities = { supported: false, error: e.message }
+      }
+
+      // Extended Screen Properties
+      collected.screenExtended = getExtendedScreenFingerprint()
+
+      // Performance Memory (JS heap info)
+      collected.performanceMemory = getPerformanceMemoryFingerprint()
+
+      // Hardware Permissions Status
+      try {
+        collected.permissionsStatus = await getPermissionsFingerprint()
+      } catch (e) {
+        collected.permissionsStatus = { supported: false, error: e.message }
+      }
+
       // Generate device fingerprint from cross-browser stable signals
       const deviceFp = generateDeviceFingerprint(collected)
       setDeviceFingerprint(deviceFp)
@@ -1555,4 +1599,541 @@ function detectDatabaseType(name) {
   if (nameLower.includes('analytics')) return 'analytics'
 
   return 'other'
+}
+
+// Client Hints API - high entropy device information
+async function getClientHintsFingerprint() {
+  if (!navigator.userAgentData) {
+    return { supported: false, reason: 'userAgentData not available' }
+  }
+
+  const result = {
+    supported: true,
+    // Low entropy (always available)
+    brands: navigator.userAgentData.brands?.map(b => `${b.brand}/${b.version}`).join(', '),
+    mobile: navigator.userAgentData.mobile,
+    platform: navigator.userAgentData.platform,
+  }
+
+  // High entropy (requires async call)
+  try {
+    const highEntropy = await navigator.userAgentData.getHighEntropyValues([
+      'architecture',
+      'bitness',
+      'model',
+      'platformVersion',
+      'fullVersionList',
+      'wow64',
+      'formFactor',
+    ])
+
+    result.architecture = highEntropy.architecture || 'N/A'
+    result.bitness = highEntropy.bitness || 'N/A'
+    result.model = highEntropy.model || 'N/A'
+    result.platformVersion = highEntropy.platformVersion || 'N/A'
+    result.wow64 = highEntropy.wow64
+    result.formFactor = highEntropy.formFactor?.join(', ') || 'N/A'
+    result.fullVersionList = highEntropy.fullVersionList?.map(b => `${b.brand}/${b.version}`).join(', ')
+  } catch (e) {
+    result.highEntropyError = e.message
+  }
+
+  return result
+}
+
+// Enhanced WebGL Parameters - complete GPU capability fingerprint
+function getWebGLParametersFingerprint() {
+  const canvas = document.createElement('canvas')
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+
+  if (!gl) {
+    return { supported: false }
+  }
+
+  const result = {
+    supported: true,
+    // Basic info
+    version: gl.getParameter(gl.VERSION),
+    shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
+    vendor: gl.getParameter(gl.VENDOR),
+    renderer: gl.getParameter(gl.RENDERER),
+
+    // Debug info (unmasked)
+    unmaskedVendor: null,
+    unmaskedRenderer: null,
+
+    // Texture limits
+    maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+    maxCubeMapTextureSize: gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE),
+    maxRenderbufferSize: gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
+    maxTextureImageUnits: gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),
+    maxCombinedTextureImageUnits: gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS),
+    maxVertexTextureImageUnits: gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS),
+
+    // Vertex shader limits
+    maxVertexAttribs: gl.getParameter(gl.MAX_VERTEX_ATTRIBS),
+    maxVertexUniformVectors: gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS),
+    maxVaryingVectors: gl.getParameter(gl.MAX_VARYING_VECTORS),
+
+    // Fragment shader limits
+    maxFragmentUniformVectors: gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS),
+
+    // Viewport
+    maxViewportDims: gl.getParameter(gl.MAX_VIEWPORT_DIMS)?.join('x'),
+    aliasedLineWidthRange: gl.getParameter(gl.ALIASED_LINE_WIDTH_RANGE)?.join('-'),
+    aliasedPointSizeRange: gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)?.join('-'),
+
+    // Bits
+    redBits: gl.getParameter(gl.RED_BITS),
+    greenBits: gl.getParameter(gl.GREEN_BITS),
+    blueBits: gl.getParameter(gl.BLUE_BITS),
+    alphaBits: gl.getParameter(gl.ALPHA_BITS),
+    depthBits: gl.getParameter(gl.DEPTH_BITS),
+    stencilBits: gl.getParameter(gl.STENCIL_BITS),
+
+    // Extensions
+    extensions: gl.getSupportedExtensions()?.length || 0,
+    extensionsList: gl.getSupportedExtensions()?.slice(0, 20).join(', ') + (gl.getSupportedExtensions()?.length > 20 ? '...' : ''),
+
+    // Shader precision
+    shaderPrecision: {},
+  }
+
+  // Get unmasked renderer info
+  const debugInfo = gl.getExtension('WEBGL_debug_renderer_info')
+  if (debugInfo) {
+    result.unmaskedVendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)
+    result.unmaskedRenderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+  }
+
+  // Get shader precision formats
+  const shaderTypes = ['VERTEX_SHADER', 'FRAGMENT_SHADER']
+  const precisionTypes = ['LOW_FLOAT', 'MEDIUM_FLOAT', 'HIGH_FLOAT', 'LOW_INT', 'MEDIUM_INT', 'HIGH_INT']
+
+  for (const shaderType of shaderTypes) {
+    for (const precisionType of precisionTypes) {
+      try {
+        const precision = gl.getShaderPrecisionFormat(gl[shaderType], gl[precisionType])
+        if (precision) {
+          result.shaderPrecision[`${shaderType}_${precisionType}`] = {
+            rangeMin: precision.rangeMin,
+            rangeMax: precision.rangeMax,
+            precision: precision.precision,
+          }
+        }
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
+  // Hash the shader precision for compact display
+  result.shaderPrecisionHash = hashCode(JSON.stringify(result.shaderPrecision))
+
+  return result
+}
+
+// Device Sensors - accelerometer, gyroscope, orientation
+async function getDeviceSensorsFingerprint() {
+  const result = {
+    supported: false,
+    deviceMotion: false,
+    deviceOrientation: false,
+    accelerometer: false,
+    gyroscope: false,
+    magnetometer: false,
+    absoluteOrientation: false,
+    relativeOrientation: false,
+    ambientLight: false,
+    sensors: {},
+  }
+
+  // Check DeviceMotionEvent
+  if (typeof DeviceMotionEvent !== 'undefined') {
+    result.deviceMotion = true
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      result.deviceMotionPermissionRequired = true
+    }
+  }
+
+  // Check DeviceOrientationEvent
+  if (typeof DeviceOrientationEvent !== 'undefined') {
+    result.deviceOrientation = true
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      result.deviceOrientationPermissionRequired = true
+    }
+  }
+
+  // Check Generic Sensor API sensors
+  const sensorTypes = [
+    { name: 'Accelerometer', key: 'accelerometer' },
+    { name: 'Gyroscope', key: 'gyroscope' },
+    { name: 'Magnetometer', key: 'magnetometer' },
+    { name: 'AbsoluteOrientationSensor', key: 'absoluteOrientation' },
+    { name: 'RelativeOrientationSensor', key: 'relativeOrientation' },
+    { name: 'AmbientLightSensor', key: 'ambientLight' },
+    { name: 'LinearAccelerationSensor', key: 'linearAcceleration' },
+    { name: 'GravitySensor', key: 'gravity' },
+  ]
+
+  for (const { name, key } of sensorTypes) {
+    if (name in window) {
+      result[key] = true
+      result.supported = true
+
+      // Try to get sensor info
+      try {
+        const SensorClass = window[name]
+        const sensor = new SensorClass({ frequency: 1 })
+
+        result.sensors[key] = {
+          available: true,
+          activated: false,
+        }
+
+        // Try to read a value (might require permission)
+        await new Promise((resolve) => {
+          const timeout = setTimeout(() => {
+            sensor.stop()
+            resolve()
+          }, 100)
+
+          sensor.addEventListener('reading', () => {
+            clearTimeout(timeout)
+            result.sensors[key].activated = true
+            if (sensor.x !== undefined) result.sensors[key].hasXYZ = true
+            if (sensor.quaternion !== undefined) result.sensors[key].hasQuaternion = true
+            if (sensor.illuminance !== undefined) result.sensors[key].hasIlluminance = true
+            sensor.stop()
+            resolve()
+          })
+
+          sensor.addEventListener('error', (e) => {
+            clearTimeout(timeout)
+            result.sensors[key].error = e.error?.name || 'unknown'
+            resolve()
+          })
+
+          try {
+            sensor.start()
+          } catch (e) {
+            clearTimeout(timeout)
+            result.sensors[key].error = e.message
+            resolve()
+          }
+        })
+      } catch (e) {
+        result.sensors[key] = {
+          available: true,
+          error: e.message,
+        }
+      }
+    }
+  }
+
+  // Check for sensor timestamp (boot time leak)
+  if (result.supported && performance.now) {
+    result.performanceNowPrecision = performance.now().toString().split('.')[1]?.length || 0
+  }
+
+  return result
+}
+
+// Gamepad API fingerprint
+function getGamepadFingerprint() {
+  if (!navigator.getGamepads) {
+    return { supported: false }
+  }
+
+  const result = {
+    supported: true,
+    gamepadsDetected: 0,
+    gamepads: [],
+  }
+
+  try {
+    const gamepads = navigator.getGamepads()
+    for (const gamepad of gamepads) {
+      if (gamepad) {
+        result.gamepadsDetected++
+        result.gamepads.push({
+          id: gamepad.id,
+          index: gamepad.index,
+          mapping: gamepad.mapping,
+          axes: gamepad.axes?.length || 0,
+          buttons: gamepad.buttons?.length || 0,
+          connected: gamepad.connected,
+          timestamp: gamepad.timestamp,
+          vibrationActuator: !!gamepad.vibrationActuator,
+        })
+      }
+    }
+  } catch (e) {
+    result.error = e.message
+  }
+
+  return result
+}
+
+// Media Capabilities - hardware codec support
+async function getMediaCapabilitiesFingerprint() {
+  if (!navigator.mediaCapabilities) {
+    return { supported: false }
+  }
+
+  const result = {
+    supported: true,
+    videoCodecs: {},
+    audioCodecs: {},
+  }
+
+  // Test video codecs
+  const videoCodecs = [
+    { name: 'H.264 Baseline', contentType: 'video/mp4; codecs="avc1.42E01E"' },
+    { name: 'H.264 Main', contentType: 'video/mp4; codecs="avc1.4D401E"' },
+    { name: 'H.264 High', contentType: 'video/mp4; codecs="avc1.64001E"' },
+    { name: 'H.265/HEVC', contentType: 'video/mp4; codecs="hvc1.1.6.L93.B0"' },
+    { name: 'VP8', contentType: 'video/webm; codecs="vp8"' },
+    { name: 'VP9', contentType: 'video/webm; codecs="vp9"' },
+    { name: 'VP9 Profile 2', contentType: 'video/webm; codecs="vp09.02.10.10"' },
+    { name: 'AV1', contentType: 'video/mp4; codecs="av01.0.01M.08"' },
+  ]
+
+  for (const codec of videoCodecs) {
+    try {
+      const config = {
+        type: 'file',
+        video: {
+          contentType: codec.contentType,
+          width: 1920,
+          height: 1080,
+          bitrate: 5000000,
+          framerate: 30,
+        },
+      }
+      const info = await navigator.mediaCapabilities.decodingInfo(config)
+      result.videoCodecs[codec.name] = {
+        supported: info.supported,
+        smooth: info.smooth,
+        powerEfficient: info.powerEfficient,
+      }
+    } catch {
+      result.videoCodecs[codec.name] = { supported: false, error: true }
+    }
+  }
+
+  // Test audio codecs
+  const audioCodecs = [
+    { name: 'AAC', contentType: 'audio/mp4; codecs="mp4a.40.2"' },
+    { name: 'Opus', contentType: 'audio/webm; codecs="opus"' },
+    { name: 'Vorbis', contentType: 'audio/webm; codecs="vorbis"' },
+    { name: 'FLAC', contentType: 'audio/flac' },
+    { name: 'MP3', contentType: 'audio/mpeg' },
+  ]
+
+  for (const codec of audioCodecs) {
+    try {
+      const config = {
+        type: 'file',
+        audio: {
+          contentType: codec.contentType,
+          channels: 2,
+          bitrate: 128000,
+          samplerate: 48000,
+        },
+      }
+      const info = await navigator.mediaCapabilities.decodingInfo(config)
+      result.audioCodecs[codec.name] = {
+        supported: info.supported,
+        smooth: info.smooth,
+        powerEfficient: info.powerEfficient,
+      }
+    } catch {
+      result.audioCodecs[codec.name] = { supported: false, error: true }
+    }
+  }
+
+  // Count supported codecs
+  result.supportedVideoCodecs = Object.values(result.videoCodecs).filter(c => c.supported).length
+  result.supportedAudioCodecs = Object.values(result.audioCodecs).filter(c => c.supported).length
+  result.hardwareAcceleratedVideo = Object.values(result.videoCodecs).filter(c => c.powerEfficient).length
+
+  return result
+}
+
+// Extended Screen Properties
+function getExtendedScreenFingerprint() {
+  const result = {
+    // Basic screen (already collected but included for completeness)
+    width: screen.width,
+    height: screen.height,
+    availWidth: screen.availWidth,
+    availHeight: screen.availHeight,
+    colorDepth: screen.colorDepth,
+    pixelDepth: screen.pixelDepth,
+
+    // Window properties
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    outerWidth: window.outerWidth,
+    outerHeight: window.outerHeight,
+
+    // Window position
+    screenX: window.screenX,
+    screenY: window.screenY,
+    screenLeft: window.screenLeft,
+    screenTop: window.screenTop,
+
+    // Device pixel ratio
+    devicePixelRatio: window.devicePixelRatio,
+
+    // Orientation
+    orientationType: screen.orientation?.type || 'N/A',
+    orientationAngle: screen.orientation?.angle ?? 'N/A',
+
+    // Multi-monitor detection
+    isExtended: screen.isExtended ?? 'N/A',
+
+    // Visual viewport (if available)
+    visualViewport: null,
+
+    // CSS media queries
+    prefersColorScheme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+    prefersReducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    prefersContrast: window.matchMedia('(prefers-contrast: more)').matches ? 'more' : 'normal',
+    forcedColors: window.matchMedia('(forced-colors: active)').matches,
+    prefersReducedTransparency: window.matchMedia('(prefers-reduced-transparency: reduce)').matches,
+
+    // Display mode
+    displayMode: 'browser',
+
+    // HDR support
+    hdrSupported: window.matchMedia('(dynamic-range: high)').matches,
+
+    // Pointer capabilities
+    anyPointer: window.matchMedia('(any-pointer: fine)').matches ? 'fine' :
+                window.matchMedia('(any-pointer: coarse)').matches ? 'coarse' : 'none',
+    anyHover: window.matchMedia('(any-hover: hover)').matches,
+  }
+
+  // Visual viewport
+  if (window.visualViewport) {
+    result.visualViewport = {
+      width: window.visualViewport.width,
+      height: window.visualViewport.height,
+      offsetLeft: window.visualViewport.offsetLeft,
+      offsetTop: window.visualViewport.offsetTop,
+      scale: window.visualViewport.scale,
+    }
+  }
+
+  // Display mode detection
+  if (window.matchMedia('(display-mode: fullscreen)').matches) {
+    result.displayMode = 'fullscreen'
+  } else if (window.matchMedia('(display-mode: standalone)').matches) {
+    result.displayMode = 'standalone'
+  } else if (window.matchMedia('(display-mode: minimal-ui)').matches) {
+    result.displayMode = 'minimal-ui'
+  }
+
+  return result
+}
+
+// Performance Memory fingerprint
+function getPerformanceMemoryFingerprint() {
+  const result = {
+    supported: false,
+  }
+
+  // Chrome-only memory info
+  if (performance.memory) {
+    result.supported = true
+    result.jsHeapSizeLimit = performance.memory.jsHeapSizeLimit
+    result.jsHeapSizeLimitMB = Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024)
+    result.totalJSHeapSize = performance.memory.totalJSHeapSize
+    result.totalJSHeapSizeMB = Math.round(performance.memory.totalJSHeapSize / 1024 / 1024)
+    result.usedJSHeapSize = performance.memory.usedJSHeapSize
+    result.usedJSHeapSizeMB = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024)
+  }
+
+  // Device memory (also available separately)
+  if (navigator.deviceMemory) {
+    result.deviceMemory = navigator.deviceMemory
+  }
+
+  // Hardware concurrency
+  if (navigator.hardwareConcurrency) {
+    result.hardwareConcurrency = navigator.hardwareConcurrency
+  }
+
+  // Performance timing precision
+  result.performanceNowPrecision = getPerformanceNowPrecision()
+
+  return result
+}
+
+// Get performance.now() precision (can indicate browser/OS)
+function getPerformanceNowPrecision() {
+  const samples = []
+  for (let i = 0; i < 100; i++) {
+    const t = performance.now()
+    const decimal = t.toString().split('.')[1] || ''
+    samples.push(decimal.length)
+  }
+  return Math.max(...samples)
+}
+
+// Permissions API fingerprint
+async function getPermissionsFingerprint() {
+  if (!navigator.permissions) {
+    return { supported: false }
+  }
+
+  const result = {
+    supported: true,
+    permissions: {},
+  }
+
+  const permissionNames = [
+    'geolocation',
+    'notifications',
+    'push',
+    'midi',
+    'camera',
+    'microphone',
+    'speaker-selection',
+    'device-info',
+    'background-fetch',
+    'background-sync',
+    'bluetooth',
+    'persistent-storage',
+    'ambient-light-sensor',
+    'accelerometer',
+    'gyroscope',
+    'magnetometer',
+    'clipboard-read',
+    'clipboard-write',
+    'screen-wake-lock',
+    'nfc',
+    'display-capture',
+    'idle-detection',
+  ]
+
+  for (const name of permissionNames) {
+    try {
+      const status = await navigator.permissions.query({ name })
+      result.permissions[name] = status.state
+    } catch {
+      result.permissions[name] = 'not-supported'
+    }
+  }
+
+  // Count by state
+  const states = Object.values(result.permissions)
+  result.granted = states.filter(s => s === 'granted').length
+  result.denied = states.filter(s => s === 'denied').length
+  result.prompt = states.filter(s => s === 'prompt').length
+  result.notSupported = states.filter(s => s === 'not-supported').length
+
+  return result
 }

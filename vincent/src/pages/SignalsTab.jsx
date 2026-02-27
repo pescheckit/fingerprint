@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { SignalCard } from '../components'
-import { useHistoryProbe } from '../hooks'
 
 export function SignalsTab({ signals, signalsLoading, stabilityScore, expandedSections, toggleSection }) {
   const [sectionCollapsed, setSectionCollapsed] = useState({
@@ -8,9 +7,7 @@ export function SignalsTab({ signals, signalsLoading, stabilityScore, expandedSe
     software: false,
     storage: false,
     browsing: false,
-    history: false,
   })
-  const { results: historyResults, summary: historySummary, loading: historyLoading, progress: historyProgress, runProbe } = useHistoryProbe()
 
   const toggleSectionCollapse = (section) => {
     setSectionCollapsed((prev) => ({
@@ -102,6 +99,86 @@ export function SignalsTab({ signals, signalsLoading, stabilityScore, expandedSe
                 stability={stabilityScore?.signals?.battery}
                 expanded={expandedSections.battery}
                 onToggle={() => toggleSection('battery')}
+              />
+            )}
+            {signals?.webglParams && (
+              <SignalCard
+                title="WebGL Parameters"
+                icon="📊"
+                data={formatWebGLParams(signals.webglParams)}
+                stability={stabilityScore?.signals?.webglParams}
+                expanded={expandedSections.webglParams}
+                onToggle={() => toggleSection('webglParams')}
+              />
+            )}
+            {signals?.clientHints && (
+              <SignalCard
+                title="Client Hints"
+                icon="🏷️"
+                data={signals.clientHints}
+                stability={stabilityScore?.signals?.clientHints}
+                expanded={expandedSections.clientHints}
+                onToggle={() => toggleSection('clientHints')}
+              />
+            )}
+            {signals?.deviceSensors && (
+              <SignalCard
+                title="Device Sensors"
+                icon="📡"
+                data={formatDeviceSensors(signals.deviceSensors)}
+                stability={stabilityScore?.signals?.deviceSensors}
+                expanded={expandedSections.deviceSensors}
+                onToggle={() => toggleSection('deviceSensors')}
+              />
+            )}
+            {signals?.gamepads && (
+              <SignalCard
+                title="Gamepads"
+                icon="🎮"
+                data={signals.gamepads}
+                stability={stabilityScore?.signals?.gamepads}
+                expanded={expandedSections.gamepads}
+                onToggle={() => toggleSection('gamepads')}
+              />
+            )}
+            {signals?.mediaCapabilities && (
+              <SignalCard
+                title="Media Capabilities"
+                icon="🎬"
+                data={formatMediaCapabilities(signals.mediaCapabilities)}
+                stability={stabilityScore?.signals?.mediaCapabilities}
+                expanded={expandedSections.mediaCapabilities}
+                onToggle={() => toggleSection('mediaCapabilities')}
+              />
+            )}
+            {signals?.screenExtended && (
+              <SignalCard
+                title="Screen Extended"
+                icon="🖼️"
+                data={formatScreenExtended(signals.screenExtended)}
+                stability={stabilityScore?.signals?.screenExtended}
+                expanded={expandedSections.screenExtended}
+                onToggle={() => toggleSection('screenExtended')}
+              />
+            )}
+            {signals?.performanceMemory && (
+              <SignalCard
+                title="Performance Memory"
+                icon="🧠"
+                data={signals.performanceMemory}
+                stability={stabilityScore?.signals?.performanceMemory}
+                expanded={expandedSections.performanceMemory}
+                onToggle={() => toggleSection('performanceMemory')}
+              />
+            )}
+            {signals?.permissionsStatus && (
+              <SignalCard
+                title="Permissions"
+                icon="🔐"
+                data={formatPermissions(signals.permissionsStatus)}
+                stability={stabilityScore?.signals?.permissionsStatus}
+                expanded={expandedSections.permissionsStatus}
+                onToggle={() => toggleSection('permissionsStatus')}
               />
             )}
           </div>
@@ -342,143 +419,6 @@ export function SignalsTab({ signals, signalsLoading, stabilityScore, expandedSe
         )}
       </div>
 
-      {/* History Probe Section */}
-      <div className="signals-category">
-        <div
-          className="signals-category-header"
-          onClick={() => toggleSectionCollapse('history')}
-        >
-          <span className="category-icon">🕵️</span>
-          <h3>History Probe</h3>
-          <span className="category-count">
-            {historyLoading ? `${historyProgress}%` : `${historySummary.probablyVisited} / ${historySummary.total} detected`}
-          </span>
-          <span className="category-toggle">
-            {sectionCollapsed.history ? '+' : '−'}
-          </span>
-        </div>
-
-        {!sectionCollapsed.history && (
-          <div className="history-probe-section">
-            <p className="description">
-              Detects which popular sites you may have visited using browser cache timing analysis.
-              Tests <strong>{historySummary.total}</strong> websites across social media, video streaming, shopping, tech, news, finance, gaming, and more.
-            </p>
-
-            {historyLoading && (
-              <div className="probe-progress">
-                <div className="probe-progress-bar">
-                  <div className="probe-progress-fill" style={{ width: `${historyProgress}%` }}></div>
-                </div>
-                <span className="probe-progress-text">Probing... {historyProgress}% ({Math.round(historyProgress * historySummary.total / 100)} / {historySummary.total} sites)</span>
-              </div>
-            )}
-
-            <div className="probe-controls">
-              <button
-                className="probe-btn"
-                onClick={() => runProbe('favicon')}
-                disabled={historyLoading}
-              >
-                {historyLoading ? 'Probing...' : historyResults.length > 0 ? 'Re-run Probe' : 'Run History Probe'}
-              </button>
-              {!historyLoading && historyResults.length === 0 && (
-                <span className="probe-note">Auto-runs when section loads</span>
-              )}
-            </div>
-
-            {historyResults.length > 0 && !historyLoading && (
-              <div className="probe-results">
-                <div className="probe-summary">
-                  <span className="summary-label">Detected:</span>
-                  <span className="summary-value">{historySummary.probablyVisited} sites</span>
-                  <span className="summary-sites-count">out of {historySummary.tested} tested</span>
-                </div>
-
-                {/* Category breakdown */}
-                {historySummary.byCategory && Object.keys(historySummary.byCategory).length > 0 && (
-                  <div className="probe-categories">
-                    <h4>By Category</h4>
-                    <div className="category-badges">
-                      {Object.entries(historySummary.byCategory)
-                        .sort((a, b) => b[1].detected - a[1].detected)
-                        .map(([category, data]) => (
-                          <span
-                            key={category}
-                            className={`category-badge ${data.detected > 0 ? 'has-detections' : ''}`}
-                          >
-                            {getCategoryEmoji(category)} {category}: {data.detected}/{data.total}
-                          </span>
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Detected sites list */}
-                {historySummary.probablyVisited > 0 && (
-                  <div className="detected-sites">
-                    <h4>Detected Sites ({historySummary.probablyVisited})</h4>
-                    <div className="detected-sites-grid">
-                      {historyResults
-                        .filter(r => r.probablyVisited)
-                        .map((result, i) => (
-                          <div key={i} className="detected-site-chip">
-                            <span className="site-name">{result.site}</span>
-                            <span className="site-time">{result.loadTime}ms</span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                <details className="probe-details">
-                  <summary>View all results ({historyResults.length} sites tested)</summary>
-                  <div className="probe-table">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Site</th>
-                          <th>Category</th>
-                          <th>Status</th>
-                          <th>Load Time</th>
-                          <th>Confidence</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {historyResults.map((result, i) => (
-                          <tr key={i} className={result.probablyVisited ? 'detected' : ''}>
-                            <td>{result.site}</td>
-                            <td><span className="category-tag">{result.category || 'other'}</span></td>
-                            <td>
-                              {result.probablyVisited ? (
-                                <span className="detected-badge">Detected</span>
-                              ) : (
-                                <span className="not-detected">—</span>
-                              )}
-                            </td>
-                            <td>{result.loadTime}ms</td>
-                            <td>
-                              <span className={`confidence ${result.confidence}`}>
-                                {result.confidence.replace('_', ' ')}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </details>
-
-                <div className="probe-disclaimer">
-                  <strong>Note:</strong> Results are probabilistic and may include false positives.
-                  Modern browsers implement various mitigations against this technique.
-                  Cache timing can be affected by network conditions, browser extensions, and privacy settings.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
     </section>
   )
 }
@@ -491,6 +431,14 @@ function countHardwareSignals(signals) {
   if (signals?.audio) count++
   if (signals?.mediaDevices) count++
   if (signals?.battery) count++
+  if (signals?.webglParams) count++
+  if (signals?.clientHints) count++
+  if (signals?.deviceSensors) count++
+  if (signals?.gamepads) count++
+  if (signals?.mediaCapabilities) count++
+  if (signals?.screenExtended) count++
+  if (signals?.performanceMemory) count++
+  if (signals?.permissionsStatus) count++
   return count
 }
 
@@ -528,26 +476,6 @@ function countBrowsingSignals(signals) {
   return count
 }
 
-function getCategoryEmoji(category) {
-  const emojis = {
-    social: '👥',
-    video: '🎬',
-    shopping: '🛒',
-    tech: '💻',
-    news: '📰',
-    finance: '💰',
-    communication: '💬',
-    gaming: '🎮',
-    reference: '📚',
-    travel: '✈️',
-    adult: '🔞',
-    ai: '🤖',
-    search: '🔍',
-    other: '🌐',
-  }
-  return emojis[category] || '🌐'
-}
-
 function formatIPData(ipInfo) {
   const formatted = {
     publicIP: ipInfo.publicIP || 'N/A',
@@ -569,6 +497,113 @@ function formatIPData(ipInfo) {
   }
 
   return formatted
+}
+
+function formatWebGLParams(params) {
+  if (!params.supported) return params
+
+  return {
+    vendor: params.vendor,
+    renderer: params.unmaskedRenderer || params.renderer,
+    version: params.version,
+    maxTextureSize: params.maxTextureSize,
+    maxRenderbufferSize: params.maxRenderbufferSize,
+    maxVertexAttribs: params.maxVertexAttribs,
+    maxViewportDims: params.maxViewportDims,
+    extensions: `${params.extensions} extensions`,
+    shaderPrecisionHash: params.shaderPrecisionHash,
+    colorBits: `R${params.redBits} G${params.greenBits} B${params.blueBits} A${params.alphaBits}`,
+    depthBits: params.depthBits,
+    stencilBits: params.stencilBits,
+  }
+}
+
+function formatDeviceSensors(sensors) {
+  if (!sensors.supported && !sensors.deviceMotion && !sensors.deviceOrientation) {
+    return { supported: false, reason: 'No sensors detected' }
+  }
+
+  const result = {
+    deviceMotion: sensors.deviceMotion ? 'Yes' : 'No',
+    deviceOrientation: sensors.deviceOrientation ? 'Yes' : 'No',
+  }
+
+  const sensorTypes = ['accelerometer', 'gyroscope', 'magnetometer', 'absoluteOrientation', 'relativeOrientation', 'ambientLight', 'linearAcceleration', 'gravity']
+
+  for (const type of sensorTypes) {
+    if (sensors[type]) {
+      const sensorInfo = sensors.sensors?.[type]
+      if (sensorInfo?.activated) {
+        result[type] = 'Active'
+      } else if (sensorInfo?.error) {
+        result[type] = `Blocked (${sensorInfo.error})`
+      } else {
+        result[type] = 'Available'
+      }
+    }
+  }
+
+  if (sensors.deviceMotionPermissionRequired) {
+    result.motionPermissionRequired = 'Yes'
+  }
+
+  return result
+}
+
+function formatMediaCapabilities(caps) {
+  if (!caps.supported) return caps
+
+  return {
+    supportedVideoCodecs: `${caps.supportedVideoCodecs} / ${Object.keys(caps.videoCodecs).length}`,
+    supportedAudioCodecs: `${caps.supportedAudioCodecs} / ${Object.keys(caps.audioCodecs).length}`,
+    hardwareAccelerated: `${caps.hardwareAcceleratedVideo} codecs`,
+    h264: caps.videoCodecs['H.264 High']?.supported ? 'Yes' : 'No',
+    h265: caps.videoCodecs['H.265/HEVC']?.supported ? 'Yes' : 'No',
+    vp9: caps.videoCodecs['VP9']?.supported ? 'Yes' : 'No',
+    av1: caps.videoCodecs['AV1']?.supported ? 'Yes' : 'No',
+    opus: caps.audioCodecs['Opus']?.supported ? 'Yes' : 'No',
+    aac: caps.audioCodecs['AAC']?.supported ? 'Yes' : 'No',
+  }
+}
+
+function formatScreenExtended(screen) {
+  return {
+    resolution: `${screen.width}x${screen.height}`,
+    availableArea: `${screen.availWidth}x${screen.availHeight}`,
+    windowSize: `${screen.outerWidth}x${screen.outerHeight}`,
+    viewportSize: `${screen.innerWidth}x${screen.innerHeight}`,
+    position: `(${screen.screenLeft}, ${screen.screenTop})`,
+    pixelRatio: screen.devicePixelRatio,
+    orientation: `${screen.orientationType} (${screen.orientationAngle}°)`,
+    multiMonitor: screen.isExtended === true ? 'Yes' : screen.isExtended === false ? 'No' : 'Unknown',
+    colorScheme: screen.prefersColorScheme,
+    reducedMotion: screen.prefersReducedMotion ? 'Yes' : 'No',
+    hdrSupport: screen.hdrSupported ? 'Yes' : 'No',
+    displayMode: screen.displayMode,
+    pointerType: screen.anyPointer,
+    hoverCapable: screen.anyHover ? 'Yes' : 'No',
+  }
+}
+
+function formatPermissions(perms) {
+  if (!perms.supported) return perms
+
+  const summary = {
+    granted: perms.granted,
+    denied: perms.denied,
+    prompt: perms.prompt,
+    notSupported: perms.notSupported,
+  }
+
+  // Add key permissions
+  const keyPerms = ['geolocation', 'notifications', 'camera', 'microphone', 'clipboard-read', 'clipboard-write']
+  for (const perm of keyPerms) {
+    if (perms.permissions[perm]) {
+      summary[perm] = perms.permissions[perm]
+    }
+  }
+
+  return summary
 }
 
 function CookiesSection({ cookies, expanded, onToggle }) {

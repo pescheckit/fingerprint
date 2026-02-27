@@ -264,6 +264,7 @@ function NamePrompt({ onSave, onSkip }) {
 function TabNavigation({ activeTab, setActiveTab, stabilityScore, comparison, openPages, trackedPages }) {
   const openCount = openPages?.length || 0
   const trackedCount = trackedPages?.length || 0
+
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'fingerprintjs', label: 'FingerprintJS' },
