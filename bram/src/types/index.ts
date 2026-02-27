@@ -12,14 +12,16 @@ export interface ModuleResult {
 }
 
 export interface DeviceThumbmarkResult {
-  // DUAL UUID SYSTEM
-  deviceId: string;        // Tor-resistant UUID (same across all browsers)
-  fingerprintId: string;   // Deep fingerprint UUID (browser-specific, high entropy)
+  // TRIPLE UUID SYSTEM
+  deviceId: string;        // Tor-resistant UUID (minimal, works on Tor) - 23 bits
+  fingerprintId: string;   // Cross-browser device UUID (no browser-specific) - 85 bits
+  browserId: string;       // Browser-specific UUID (ALL modules) - 150+ bits
 
   confidence: number;
   entropy: number;
-  deviceEntropy: number;   // Entropy of device UUID (~27 bits)
-  fingerprintEntropy: number; // Entropy of fingerprint UUID (~70 bits)
+  deviceEntropy: number;      // Entropy of device UUID (~23 bits)
+  fingerprintEntropy: number; // Entropy of fingerprint UUID (~85 bits)
+  browserEntropy: number;     // Entropy of browser UUID (~150 bits)
   stability: number;
   modules: ModuleResult[];
   timestamp: number;

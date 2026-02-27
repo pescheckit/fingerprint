@@ -37,3 +37,10 @@ export { MouseDynamicsModule } from './mouse-dynamics';
 // CPU and hardware detection modules (Educational/Research)
 export { WebAssemblyCPUModule } from './webassembly-cpu';
 export { GamepadModule } from './gamepad';
+
+// Novel 2025-2026 techniques
+export { CSSSupportsModule } from './css-supports';
+export { MediaDevicesModule } from './media-devices';
+export { WebAuthnModule } from './webauthn';
+export { PaymentRequestModule } from './payment-request';
+export { ServiceProbingModule } from './service-probing';

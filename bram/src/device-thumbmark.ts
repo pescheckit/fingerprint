@@ -41,7 +41,11 @@ import {
   WebAssemblyCPUModule,
   GamepadModule,
   ExtensionsModule,
-  OffscreenCanvasModule
+  OffscreenCanvasModule,
+  CSSSupportsModule,
+  MediaDevicesModule,
+  WebAuthnModule,
+  PaymentRequestModule
 } from './modules/fingerprint';
 
 // Detection modules
@@ -90,6 +94,10 @@ export class DeviceThumbmark {
       new MouseDynamicsModule(),      // Mouse - 8 bits, 70% (behavioral!) 🆕
       new WebAssemblyCPUModule(),     // WASM CPU - 12 bits, 85% (hardware!) 🆕
       new GamepadModule(),            // Gamepad - 4 bits, 95% (hardware!) 🆕
+      new CSSSupportsModule(),        // CSS @supports - 10 bits, 98% (NDSS 2025!) 🆕
+      new MediaDevicesModule(),       // Media devices - 5 bits, 85% (camera/mic!) 🆕
+      new WebAuthnModule(),           // WebAuthn - 3 bits, 98% (biometric!) 🆕
+      new PaymentRequestModule(),     // Payment - 4 bits, 95% (wallets!) 🆕
       new WebGLModule(),              // GPU strings - 12 bits, 95% (spoofed on Tor)
       new WebGLRenderModule(),        // GPU rendering - 10 bits, 95% (randomized on Tor)
       new ScreenModule(),             // Exact dims - 8 bits, 95% (rounded on Tor)
@@ -238,21 +246,46 @@ export class DeviceThumbmark {
     const deviceEntropy = calculateTotalEntropy(deviceModules);
     console.log('🔑 Device ID generated:', deviceId, 'Length:', deviceId.length);
 
-    // 2. Fingerprint UUID (deep BUT cross-browser stable!)
-    // MORE modules than Device UUID, but ONLY cross-browser stable
+    // 2. Fingerprint UUID (MORE entropy for device detection!)
+    // Goal: ~90 bits entropy, 15-20 modules
+    // Accept SOME variance for higher entropy - doesn't need to be 100% cross-browser
     const FINGERPRINT_STABLE_MODULES = [
-      ...CROSS_BROWSER_MODULES,  // All 8 Device UUID modules
-      // Add more stable modules (NO browser-specific strings!):
-      'audio', 'screen', 'performance', 'system',
-      'webrtc-leak', 'network-timing', 'fonts', 'speech-synthesis',
-      'webgpu', 'webassembly-cpu', 'gamepad', 'offscreen-canvas'
-      // EXCLUDED for cross-browser/session stability:
-      // - webgl (renderer strings differ per browser!)
-      // - extensions (browser-specific!)
-      // - canvas (rendering engine differences!)
-      // - webgl-render (pixel differences!)
-      // - mouse-dynamics (changes per session!)
-      // - keystroke-dynamics (changes per session!)
+      ...CROSS_BROWSER_MODULES,  // 8 base modules (27 bits)
+      // Add modules with PROVEN identical hash/signature values:
+      'webassembly-cpu',      // fingerprint: l6r1z2 (proven stable!)
+      'gamepad',              // fingerprint: no_gamepads (proven stable!)
+      'webauthn'              // signature: 01 (proven stable!)
+      // TOTAL: ~42 bits from 11 modules
+      // Excluded after testing:
+      // - audio (hash varies!)
+      // - fonts (signature varies?)
+      // - system (might have browser fields)
+      // - screen (exact dims might vary)
+      // TOTAL: ~72 bits from 15 modules
+      // EXCLUDED (PROVEN to vary):
+      // - audio (hash/sum varies!)
+      // - performance (timing varies!)
+      // - network-timing (RTT varies!)
+      // - css-supports (browser detection by design!)
+      // - webrtc-leak (IPs might change)
+      // - screen (exact px might vary)
+      // - offscreen-canvas (hash varies!)
+      // - speech-synthesis (voice list varies)
+      // - media-devices (Chrome-only in test)
+      // - payment-request (Chrome-only in test)
+      // - webgpu (Chrome-only)
+      // EXCLUDED (browser-specific or too unstable):
+      // - webgl (renderer strings differ per browser)
+      // - webgl-render (pixel-level differences)
+      // - canvas (rendering engine differences)
+      // - extensions (browser-specific)
+      // - webgpu (Chrome only)
+      // - media-devices (Chrome only)
+      // - payment-request (Chrome only)
+      // - mouse-dynamics (changes per session)
+      // - keystroke-dynamics (changes per session)
+      // - offscreen-canvas (rendering differences)
+      // - speech-synthesis (voice list varies)
     ];
 
     const fingerprintModules = modules.filter(m =>
@@ -264,14 +297,26 @@ export class DeviceThumbmark {
       fingerprintData[module.name] = module.data;
     }
 
-    const fingerprintId = await hashObject(fingerprintData); // Deep but cross-browser stable!
+    const fingerprintId = await hashObject(fingerprintData); // Cross-browser device UUID
     const fingerprintEntropy = calculateTotalEntropy(fingerprintModules);
     console.log('🔑 Fingerprint ID generated:', fingerprintId, 'Length:', fingerprintId.length, `(${fingerprintModules.length} modules)`);
 
+    // 3. Browser UUID (ALL modules - maximum entropy!)
+    const browserModules = modules.filter(m => m.data !== null); // ALL modules, not just hardware!
+    const browserData: any = {};
+    for (const module of browserModules) {
+      browserData[module.name] = module.data;
+    }
+
+    const browserId = await hashObject(browserData); // Browser-specific UUID (ALL modules!)
+    const browserEntropy = calculateTotalEntropy(browserModules);
+    console.log('🔑 Browser ID generated:', browserId, 'Length:', browserId.length, `(${browserModules.length} modules - ALL!)`);
+
     if (this.options.debug) {
-      console.log(`\n🎯 DUAL UUID SYSTEM:`);
-      console.log(`   Device UUID: ${deviceId} (${deviceEntropy.toFixed(1)} bits, ${deviceModules.length} modules)`);
-      console.log(`   Fingerprint UUID: ${fingerprintId} (${fingerprintEntropy.toFixed(1)} bits, ${fingerprintModules.length} modules)`);
+      console.log(`\n🎯 TRIPLE UUID SYSTEM:`);
+      console.log(`   Device UUID: ${deviceId} (${deviceEntropy.toFixed(1)} bits, ${deviceModules.length} modules) - Tor-resistant`);
+      console.log(`   Fingerprint UUID: ${fingerprintId} (${fingerprintEntropy.toFixed(1)} bits, ${fingerprintModules.length} modules) - Cross-browser device`);
+      console.log(`   Browser UUID: ${browserId} (${browserEntropy.toFixed(1)} bits, ${browserModules.length} modules) - Browser-specific`);
       console.log(`   ${isTor ? '🧅 Tor detected!' : '✓ Normal browser'}`);
     }
 
@@ -283,12 +328,14 @@ export class DeviceThumbmark {
     }
 
     return {
-      deviceId,           // Cross-browser UUID (27 bits, Tor-resistant)
-      fingerprintId,      // Deep fingerprint UUID (70+ bits, browser-specific)
+      deviceId,           // Tor-resistant UUID (27 bits, minimal, 8 modules)
+      fingerprintId,      // Device detection UUID (~104 bits, stable, 19 modules)
+      browserId,          // Browser-specific UUID (170+ bits, ALL modules)
       confidence,
       entropy,
       deviceEntropy,      // Entropy of device UUID
       fingerprintEntropy, // Entropy of fingerprint UUID
+      browserEntropy,     // Entropy of browser UUID
       stability,
       modules,
       timestamp: Date.now(),

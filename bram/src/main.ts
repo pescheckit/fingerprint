@@ -169,6 +169,7 @@ async function displayResult() {
     console.log('Fingerprint ID to display:', currentResult.fingerprintId, 'Length:', currentResult.fingerprintId.length);
     animateText('deviceId', currentResult.deviceId, 30);
     animateText('fingerprintId', currentResult.fingerprintId, 30);
+    animateText('browserId', currentResult.browserId, 30);
 
     // Display badges
     updateBadges(currentResult);
@@ -301,6 +302,11 @@ function updateBadges(result: DeviceThumbmarkResult) {
   const fingerprintEntropyBadge = document.getElementById('fingerprintEntropyBadge');
   if (fingerprintEntropyBadge) {
     fingerprintEntropyBadge.textContent = `${result.fingerprintEntropy.toFixed(1)} bits`;
+  }
+
+  const browserEntropyBadge = document.getElementById('browserEntropyBadge');
+  if (browserEntropyBadge) {
+    browserEntropyBadge.textContent = `${result.browserEntropy.toFixed(1)} bits`;
   }
 
   const confidenceBadge = document.getElementById('confidenceBadge');
@@ -754,6 +760,15 @@ function setupEventListeners() {
     btnCopyFingerprint.addEventListener('click', async () => {
       if (!currentResult) return;
       await copyToClipboard(currentResult.fingerprintId, 'btnCopyFingerprint');
+    });
+  }
+
+  // Copy Browser UUID button
+  const btnCopyBrowser = document.getElementById('btnCopyBrowser');
+  if (btnCopyBrowser) {
+    btnCopyBrowser.addEventListener('click', async () => {
+      if (!currentResult) return;
+      await copyToClipboard(currentResult.browserId, 'btnCopyBrowser');
     });
   }
 

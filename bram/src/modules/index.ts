@@ -48,7 +48,11 @@ export {
   KeystrokeDynamicsModule,
   MouseDynamicsModule,
   WebAssemblyCPUModule,
-  GamepadModule
+  GamepadModule,
+  CSSSupportsModule,
+  MediaDevicesModule,
+  WebAuthnModule,
+  PaymentRequestModule
 } from './fingerprint';
 
 // Detection modules

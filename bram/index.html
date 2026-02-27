@@ -1025,16 +1025,29 @@
 
           <div class="uuid-card fingerprint">
             <div class="uuid-header">
-              <div class="uuid-title">Fingerprint UUID - Deep Analysis</div>
-              <div class="tooltip-icon" data-tooltip="High-entropy fingerprint, may vary by browser">?</div>
+              <div class="uuid-title">Fingerprint UUID - Device Detection</div>
+              <div class="tooltip-icon" data-tooltip="Cross-browser device fingerprint">?</div>
             </div>
             <div class="uuid-value" id="fingerprintId" style="font-size: 1.3rem;">-</div>
             <div class="uuid-meta">
-              <span>Browser-Specific</span>
-              <span id="confidenceBadge">0% confidence</span>
+              <span>Cross-Browser Stable</span>
               <span id="fingerprintEntropyBadge">0 bits</span>
             </div>
             <button class="copy-btn" id="btnCopyFingerprint">Copy Fingerprint UUID</button>
+          </div>
+
+          <div class="uuid-card browser" style="border-color: var(--accent-green);">
+            <div class="uuid-header">
+              <div class="uuid-title">Browser UUID - Full Fingerprint</div>
+              <div class="tooltip-icon" data-tooltip="All modules - browser-specific">?</div>
+            </div>
+            <div class="uuid-value" id="browserId" style="font-size: 1.3rem;">-</div>
+            <div class="uuid-meta">
+              <span>Browser-Specific</span>
+              <span id="confidenceBadge">0% confidence</span>
+              <span id="browserEntropyBadge">0 bits</span>
+            </div>
+            <button class="copy-btn" id="btnCopyBrowser">Copy Browser UUID</button>
           </div>
         </div>
 
