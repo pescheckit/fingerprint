@@ -27,6 +27,8 @@ export { NetworkTimingModule } from './network-timing';
 export { FontsModule } from './fonts';
 export { SpeechSynthesisModule } from './speech-synthesis';
 export { WebGPUModule } from './webgpu';
+export { ExtensionsModule } from './extensions';
+export { OffscreenCanvasModule } from './offscreen-canvas';
 
 // Behavioral biometrics modules (Educational/Research)
 export { KeystrokeDynamicsModule } from './keystroke';
