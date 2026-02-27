@@ -20,6 +20,6 @@ rsync -avz --delete \
   "$SERVER:$REMOTE_DIR/"
 
 # Install deps and restart
-ssh -i $SSH_KEY $SERVER "cd $REMOTE_DIR && npm install --production && sudo pm2 restart fingerprint-api"
+ssh -i $SSH_KEY $SERVER "cd $REMOTE_DIR && sudo npm install --omit=dev && sudo pm2 restart fingerprint-api"
 
 echo "Deployed! API live at https://bingo-barry.nl/fingerprint/"

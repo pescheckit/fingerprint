@@ -7,7 +7,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export class Store {
   constructor(dbPath) {
     this.db = new Database(dbPath || join(__dirname, 'fingerprints.db'));
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('busy_timeout = 5000');
     this._initialize();
+    this._prepareStatements();
   }
 
   _initialize() {
@@ -35,25 +38,80 @@ export class Store {
       );
       CREATE INDEX IF NOT EXISTS idx_profiles_visitor_id ON profiles(visitor_id);
       CREATE INDEX IF NOT EXISTS idx_profiles_device_id ON profiles(device_id);
+      CREATE INDEX IF NOT EXISTS idx_profiles_ip_subnet ON profiles(ip_subnet);
+      CREATE INDEX IF NOT EXISTS idx_profiles_fingerprint ON profiles(fingerprint);
+
+      CREATE TABLE IF NOT EXISTS etags (
+        etag TEXT PRIMARY KEY,
+        visitor_id TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_etags_visitor_id ON etags(visitor_id);
     `);
   }
 
-  saveProfile(data) {
-    const stmt = this.db.prepare(`
-      INSERT INTO profiles (
-        visitor_id, fingerprint, device_id, ip, ip_subnet,
-        audio_sum, timezone, timezone_offset, languages,
-        screen_width, screen_height, hardware_concurrency,
-        device_memory, platform, touch_support, color_depth
-      ) VALUES (
-        @visitor_id, @fingerprint, @device_id, @ip, @ip_subnet,
-        @audio_sum, @timezone, @timezone_offset, @languages,
-        @screen_width, @screen_height, @hardware_concurrency,
-        @device_memory, @platform, @touch_support, @color_depth
-      )
-    `);
+  _prepareStatements() {
+    this._stmts = {
+      saveProfile: this.db.prepare(`
+        INSERT INTO profiles (
+          visitor_id, fingerprint, device_id, ip, ip_subnet,
+          audio_sum, timezone, timezone_offset, languages,
+          screen_width, screen_height, hardware_concurrency,
+          device_memory, platform, touch_support, color_depth
+        ) VALUES (
+          @visitor_id, @fingerprint, @device_id, @ip, @ip_subnet,
+          @audio_sum, @timezone, @timezone_offset, @languages,
+          @screen_width, @screen_height, @hardware_concurrency,
+          @device_memory, @platform, @touch_support, @color_depth
+        )
+      `),
+      getProfile: this.db.prepare(
+        'SELECT * FROM profiles WHERE visitor_id = ? ORDER BY created_at DESC LIMIT 1'
+      ),
+      // Pre-filter candidates by indexed columns to avoid full table scan
+      findCandidates: this.db.prepare(`
+        SELECT * FROM profiles
+        WHERE device_id = @device_id
+           OR ip_subnet = @ip_subnet
+           OR fingerprint = @fingerprint
+        ORDER BY created_at DESC
+      `),
+      // Fallback: get recent unique profiles (capped) when no indexed matches
+      findRecent: this.db.prepare(`
+        SELECT * FROM (
+          SELECT *, ROW_NUMBER() OVER (PARTITION BY visitor_id ORDER BY id DESC) as rn
+          FROM profiles
+        ) WHERE rn = 1
+        ORDER BY id DESC
+        LIMIT 500
+      `),
+      // Deduplicate: keep only the latest profile per visitor_id, delete older ones
+      pruneOld: this.db.prepare(`
+        DELETE FROM profiles WHERE id NOT IN (
+          SELECT MAX(id) FROM profiles GROUP BY visitor_id
+        ) AND created_at < datetime('now', '-7 days')
+      `),
+      // Delete profiles older than N days
+      pruneStale: this.db.prepare(
+        "DELETE FROM profiles WHERE created_at < datetime('now', ? || ' days')"
+      ),
+      profileCount: this.db.prepare('SELECT COUNT(*) as count FROM profiles'),
 
-    return stmt.run({
+      // ETag operations
+      getEtag: this.db.prepare('SELECT visitor_id FROM etags WHERE etag = ?'),
+      setEtag: this.db.prepare(`
+        INSERT INTO etags (etag, visitor_id) VALUES (@etag, @visitor_id)
+        ON CONFLICT(etag) DO UPDATE SET visitor_id = @visitor_id, updated_at = datetime('now')
+      `),
+      pruneEtags: this.db.prepare(
+        "DELETE FROM etags WHERE updated_at < datetime('now', '-90 days')"
+      ),
+    };
+  }
+
+  saveProfile(data) {
+    return this._stmts.saveProfile.run({
       visitor_id: data.visitor_id || null,
       fingerprint: data.fingerprint || null,
       device_id: data.deviceId || null,
@@ -73,14 +131,22 @@ export class Store {
     });
   }
 
-  findMatches() {
-    const stmt = this.db.prepare('SELECT * FROM profiles');
-    return stmt.all();
+  findMatches(signals = {}) {
+    // Try indexed candidate search first
+    if (signals.deviceId || signals.ipSubnet || signals.fingerprint) {
+      const candidates = this._stmts.findCandidates.all({
+        device_id: signals.deviceId || '',
+        ip_subnet: signals.ipSubnet || '',
+        fingerprint: signals.fingerprint || '',
+      });
+      if (candidates.length > 0) return candidates;
+    }
+    // Fallback to recent unique profiles (capped at 500)
+    return this._stmts.findRecent.all();
   }
 
   getProfile(visitorId) {
-    const stmt = this.db.prepare('SELECT * FROM profiles WHERE visitor_id = ? ORDER BY created_at DESC LIMIT 1');
-    return stmt.get(visitorId);
+    return this._stmts.getProfile.get(visitorId);
   }
 
   updateProfile(visitorId, data) {
@@ -123,5 +189,32 @@ export class Store {
     `);
 
     return stmt.run(values);
+  }
+
+  // ETag operations
+  getEtag(etag) {
+    const row = this._stmts.getEtag.get(etag);
+    return row ? row.visitor_id : null;
+  }
+
+  setEtag(etag, visitorId) {
+    return this._stmts.setEtag.run({ etag, visitor_id: visitorId });
+  }
+
+  // Maintenance
+  prune() {
+    const dupes = this._stmts.pruneOld.run();
+    const stale = this._stmts.pruneStale.run('-90');
+    const etags = this._stmts.pruneEtags.run();
+    return {
+      duplicatesRemoved: dupes.changes,
+      staleRemoved: stale.changes,
+      etagsRemoved: etags.changes,
+    };
+  }
+
+  getStats() {
+    const { count } = this._stmts.profileCount.get();
+    return { profileCount: count };
   }
 }

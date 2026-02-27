@@ -8,64 +8,160 @@ const app = express();
 const store = new Store();
 const PORT = process.env.PORT || 3001;
 
+// --- Middleware ---
+
 app.set('trust proxy', true);
+
 app.use(cors({
   origin: ['https://fingerprint-3y6.pages.dev', 'http://localhost:5173', 'http://localhost:4173'],
   credentials: true,
+  exposedHeaders: ['ETag'],
 }));
-app.use(express.json());
 
-// ETag store (in-memory map for simplicity)
-const etagStore = new Map();
+app.use(express.json({ limit: '50kb' }));
+
+// Rate limiting: per-IP, sliding window
+const rateLimits = new Map();
+const RATE_LIMIT = 30;      // requests
+const RATE_WINDOW = 60_000; // per minute
+
+function rateLimit(req, res, next) {
+  const ip = req.ip || 'unknown';
+  const now = Date.now();
+
+  if (!rateLimits.has(ip)) {
+    rateLimits.set(ip, []);
+  }
+
+  const timestamps = rateLimits.get(ip).filter(t => now - t < RATE_WINDOW);
+  if (timestamps.length >= RATE_LIMIT) {
+    return res.status(429).json({ error: 'Too many requests, try again later' });
+  }
+
+  timestamps.push(now);
+  rateLimits.set(ip, timestamps);
+  next();
+}
+
+app.use('/api', rateLimit);
+
+// --- Routes ---
 
 // POST /api/fingerprint — receive fingerprint, store, match
 app.post('/api/fingerprint', (req, res) => {
-  const data = req.body;
-  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-  const ipSubnet = ip.split('.').slice(0, 3).join('.'); // /24
+  try {
+    const data = req.body;
+    if (!data || typeof data !== 'object') {
+      return res.status(400).json({ error: 'Invalid request body' });
+    }
 
-  const signals = {
-    ...data,
-    ip,
-    ipSubnet,
-  };
+    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    const ipSubnet = ip.split('.').slice(0, 3).join('.');
 
-  // Find matches
-  const profiles = store.findMatches();
-  const match = findBestMatch(signals, profiles);
+    const signals = { ...data, ip, ipSubnet };
 
-  // Store the profile
-  const visitorId = match ? match.visitorId : (data.visitorId || crypto.randomUUID());
-  store.saveProfile({ ...signals, visitor_id: visitorId });
+    // Find matches using indexed candidate search
+    const profiles = store.findMatches(signals);
+    const match = findBestMatch(signals, profiles);
 
-  res.json({
-    matchedVisitorId: match ? match.visitorId : null,
-    confidence: match ? match.confidence : 0,
-    matchedSignals: match ? match.matchedSignals : [],
-    visitorId,
-  });
-});
+    // Store the profile
+    const visitorId = match ? match.visitorId : (data.visitorId || crypto.randomUUID());
+    store.saveProfile({ ...signals, visitor_id: visitorId });
 
-// GET /api/etag-store — ETag-based visitor ID
-app.get('/api/etag-store', (req, res) => {
-  const etag = req.headers['if-none-match'];
-  if (etag && etagStore.has(etag)) {
-    res.set('ETag', etag);
-    res.json({ visitorId: etagStore.get(etag) });
-  } else {
-    res.status(204).end();
+    res.json({
+      matchedVisitorId: match ? match.visitorId : null,
+      confidence: match ? match.confidence : 0,
+      matchedSignals: match ? match.matchedSignals : [],
+      visitorId,
+    });
+  } catch (err) {
+    console.error('POST /api/fingerprint error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// POST /api/etag-store — store visitor ID for ETag
-app.post('/api/etag-store', (req, res) => {
-  const { visitorId } = req.body;
-  const etag = `"${visitorId}"`;
-  etagStore.set(etag, visitorId);
-  res.set('ETag', etag);
-  res.json({ stored: true, etag });
+// GET /api/etag-store — ETag-based visitor ID persistence
+app.get('/api/etag-store', (req, res) => {
+  try {
+    const etag = req.headers['if-none-match'];
+    if (etag) {
+      const visitorId = store.getEtag(etag);
+      if (visitorId) {
+        res.set('ETag', etag);
+        return res.json({ visitorId });
+      }
+    }
+    res.status(204).end();
+  } catch (err) {
+    console.error('GET /api/etag-store error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
+
+// POST /api/etag-store — store visitor ID for ETag persistence
+app.post('/api/etag-store', (req, res) => {
+  try {
+    const { visitorId } = req.body;
+    if (!visitorId || typeof visitorId !== 'string') {
+      return res.status(400).json({ error: 'visitorId is required' });
+    }
+
+    const etag = `"${visitorId}"`;
+    store.setEtag(etag, visitorId);
+    res.set('ETag', etag);
+    res.json({ stored: true, etag });
+  } catch (err) {
+    console.error('POST /api/etag-store error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/stats — basic health check
+app.get('/api/stats', (req, res) => {
+  try {
+    const stats = store.getStats();
+    res.json({ status: 'ok', ...stats, uptime: process.uptime() });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- Maintenance ---
+
+// Prune old/duplicate profiles every 6 hours
+setInterval(() => {
+  try {
+    const result = store.prune();
+    if (result.duplicatesRemoved + result.staleRemoved + result.etagsRemoved > 0) {
+      console.log('Pruned:', result);
+    }
+  } catch (err) {
+    console.error('Prune error:', err.message);
+  }
+}, 6 * 60 * 60 * 1000);
+
+// Clean up rate limit map every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, timestamps] of rateLimits) {
+    const active = timestamps.filter(t => now - t < RATE_WINDOW);
+    if (active.length === 0) {
+      rateLimits.delete(ip);
+    } else {
+      rateLimits.set(ip, active);
+    }
+  }
+}, 5 * 60 * 1000);
+
+// --- Start ---
 
 app.listen(PORT, () => {
   console.log(`Fingerprint server running on port ${PORT}`);
+  // Run initial prune on startup
+  try {
+    const result = store.prune();
+    console.log('Startup prune:', result);
+  } catch (err) {
+    console.error('Startup prune error:', err.message);
+  }
 });

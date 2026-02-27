@@ -82,7 +82,7 @@ describe('Store', () => {
       store.saveProfile(makeProfileData());
       store.saveProfile(makeProfileData({ fingerprint: 'fp-different' }));
 
-      const all = store.findMatches();
+      const all = store.findMatches({ deviceId: 'device-hash-xyz' });
       const matching = all.filter(p => p.visitor_id === 'visitor-test-123');
       assert.equal(matching.length, 2);
     });
@@ -90,17 +90,54 @@ describe('Store', () => {
 
   describe('findMatches', () => {
     it('returns an empty array when no profiles exist', () => {
-      const profiles = store.findMatches();
+      const profiles = store.findMatches({});
       assert.deepEqual(profiles, []);
     });
 
-    it('returns all stored profiles', () => {
+    it('finds candidates by device_id', () => {
+      store.saveProfile(makeProfileData({ visitor_id: 'v1', deviceId: 'dev-A' }));
+      store.saveProfile(makeProfileData({ visitor_id: 'v2', deviceId: 'dev-B' }));
+
+      const results = store.findMatches({ deviceId: 'dev-A' });
+      assert.equal(results.length, 1);
+      assert.equal(results[0].visitor_id, 'v1');
+    });
+
+    it('finds candidates by ip_subnet', () => {
+      store.saveProfile(makeProfileData({ visitor_id: 'v1', ipSubnet: '10.0.0' }));
+      store.saveProfile(makeProfileData({ visitor_id: 'v2', ipSubnet: '192.168.1' }));
+
+      const results = store.findMatches({ ipSubnet: '10.0.0' });
+      assert.equal(results.length, 1);
+      assert.equal(results[0].visitor_id, 'v1');
+    });
+
+    it('finds candidates by fingerprint', () => {
+      store.saveProfile(makeProfileData({ visitor_id: 'v1', fingerprint: 'fp-AAA' }));
+      store.saveProfile(makeProfileData({ visitor_id: 'v2', fingerprint: 'fp-BBB' }));
+
+      const results = store.findMatches({ fingerprint: 'fp-AAA' });
+      assert.equal(results.length, 1);
+      assert.equal(results[0].visitor_id, 'v1');
+    });
+
+    it('falls back to recent unique profiles when no indexed match', () => {
       store.saveProfile(makeProfileData({ visitor_id: 'v1' }));
       store.saveProfile(makeProfileData({ visitor_id: 'v2' }));
       store.saveProfile(makeProfileData({ visitor_id: 'v3' }));
 
-      const profiles = store.findMatches();
-      assert.equal(profiles.length, 3);
+      const results = store.findMatches({});
+      assert.equal(results.length, 3);
+    });
+
+    it('deduplicates by visitor_id in fallback mode', () => {
+      store.saveProfile(makeProfileData({ visitor_id: 'v1', fingerprint: 'old' }));
+      store.saveProfile(makeProfileData({ visitor_id: 'v1', fingerprint: 'new' }));
+
+      const results = store.findMatches({});
+      const v1profiles = results.filter(r => r.visitor_id === 'v1');
+      assert.equal(v1profiles.length, 1);
+      assert.equal(v1profiles[0].fingerprint, 'new');
     });
   });
 
@@ -158,6 +195,43 @@ describe('Store', () => {
       assert.equal(profile.platform, 'macOS ARM');
       assert.equal(profile.timezone, 'Europe/Amsterdam');
       assert.equal(profile.screen_width, 1920);
+    });
+  });
+
+  describe('ETag operations', () => {
+    it('stores and retrieves etag', () => {
+      store.setEtag('"visitor-abc"', 'visitor-abc');
+      const result = store.getEtag('"visitor-abc"');
+      assert.equal(result, 'visitor-abc');
+    });
+
+    it('returns null for unknown etag', () => {
+      const result = store.getEtag('"nonexistent"');
+      assert.equal(result, null);
+    });
+
+    it('upserts etag on conflict', () => {
+      store.setEtag('"tag-1"', 'visitor-old');
+      store.setEtag('"tag-1"', 'visitor-new');
+      const result = store.getEtag('"tag-1"');
+      assert.equal(result, 'visitor-new');
+    });
+  });
+
+  describe('maintenance', () => {
+    it('getStats returns profile count', () => {
+      store.saveProfile(makeProfileData({ visitor_id: 'v1' }));
+      store.saveProfile(makeProfileData({ visitor_id: 'v2' }));
+
+      const stats = store.getStats();
+      assert.equal(stats.profileCount, 2);
+    });
+
+    it('prune runs without error on empty db', () => {
+      const result = store.prune();
+      assert.equal(typeof result.duplicatesRemoved, 'number');
+      assert.equal(typeof result.staleRemoved, 'number');
+      assert.equal(typeof result.etagsRemoved, 'number');
     });
   });
 });
