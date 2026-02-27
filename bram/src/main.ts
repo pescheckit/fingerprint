@@ -117,53 +117,63 @@ function formatModuleName(name: string): string {
 }
 
 /**
- * Regenerate thumbmark
+ * Setup event listeners (Tor-compatible - no inline handlers)
  */
-(window as any).regenerate = async () => {
-  const loadingEl = document.getElementById('loading');
-  const resultEl = document.getElementById('result');
+function setupEventListeners() {
+  // Regenerate button
+  const btnRegenerate = document.getElementById('btnRegenerate');
+  if (btnRegenerate) {
+    btnRegenerate.addEventListener('click', async () => {
+      const loadingEl = document.getElementById('loading');
+      const resultEl = document.getElementById('result');
 
-  if (loadingEl) loadingEl.style.display = 'block';
-  if (resultEl) resultEl.style.display = 'none';
+      if (loadingEl) loadingEl.style.display = 'block';
+      if (resultEl) resultEl.style.display = 'none';
 
-  await displayResult();
-};
-
-/**
- * Copy device ID to clipboard
- */
-(window as any).copyDeviceId = async () => {
-  if (!currentResult) return;
-
-  try {
-    await navigator.clipboard.writeText(currentResult.deviceId);
-    alert('✓ Device ID copied to clipboard!');
-  } catch (error) {
-    // Fallback for older browsers
-    const textarea = document.createElement('textarea');
-    textarea.value = currentResult.deviceId;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
-    alert('✓ Device ID copied to clipboard!');
+      await displayResult();
+    });
   }
-};
 
-/**
- * Show cross-browser testing instructions
- */
-(window as any).testCrossBrowser = () => {
-  const instructions = thumbmark.getCrossBrowserTestInstructions();
-  alert(instructions);
-};
+  // Copy button
+  const btnCopy = document.getElementById('btnCopy');
+  if (btnCopy) {
+    btnCopy.addEventListener('click', async () => {
+      if (!currentResult) return;
+
+      try {
+        await navigator.clipboard.writeText(currentResult.deviceId);
+        alert('✓ Device ID copied to clipboard!');
+      } catch (error) {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = currentResult.deviceId;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        alert('✓ Device ID copied to clipboard!');
+      }
+    });
+  }
+
+  // Test cross-browser button
+  const btnTest = document.getElementById('btnTest');
+  if (btnTest) {
+    btnTest.addEventListener('click', () => {
+      const instructions = thumbmark.getCrossBrowserTestInstructions();
+      alert(instructions);
+    });
+  }
+}
 
 // Auto-start on page load
 document.addEventListener('DOMContentLoaded', () => {
+  setupEventListeners();
   displayResult();
 });
 
 // Also start immediately if DOM already loaded
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setupEventListeners();
   displayResult();
 }
