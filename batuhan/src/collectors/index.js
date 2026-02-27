@@ -12,6 +12,7 @@ import { getWebRTCIPs } from './webrtc';
 import { getMathFingerprint } from './math';
 import { getPermissions } from './permissions';
 import { getGeneralInfo } from './general';
+import { detectVPNProxyTor } from './vpn-detection';
 import { hashComponents, murmurhash3 } from './hash';
 
 async function getThumbmark() {
@@ -68,6 +69,9 @@ export async function collectAllSignals() {
 
   // General info (needs signals for context, fetches IP/location)
   const general = await getGeneralInfo(signals);
+
+  // VPN/Proxy/Tor detection
+  const privacyCheck = await detectVPNProxyTor();
 
   const collectionTimeMs = Math.round((performance.now() - startTime) * 100) / 100;
 
@@ -193,6 +197,7 @@ export async function collectAllSignals() {
     collectionTimeMs,
     signals,
     general,
+    privacyCheck,
     collectedAt: new Date().toISOString(),
   };
 }
