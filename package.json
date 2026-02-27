@@ -4,6 +4,8 @@
   "description": "Collaborative fingerprinting experiment",
   "scripts": {
     "build": "node build.js",
+    "watch": "node watch.js",
+    "dev": "npm run watch",
     "deploy": "npm run build && npx wrangler pages deploy ./dist --project-name=fingerprint"
   },
   "devDependencies": {
