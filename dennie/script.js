@@ -1036,4 +1036,8 @@ async function main() {
   saveCurrent(hardwareHash, browserHash, signals);
 }
 
-main();
+main().catch(err => {
+  const app = document.getElementById('app');
+  if (app) app.innerHTML = `<div class="window"><div class="title-bar"><span class="title-bar-text">Error</span></div><div class="window-body"><p style="padding:8px;color:#800000;font-size:11px;">${err.message}</p></div></div>`;
+  console.error(err);
+});
