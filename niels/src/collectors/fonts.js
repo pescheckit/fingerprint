@@ -39,7 +39,7 @@ const TEST_SIZE = '72px';
  */
 export class FontCollector extends Collector {
   constructor() {
-    super('fonts', 'Installed font detection', ['detectedFonts']);
+    super('fonts', 'Installed font detection', []);
   }
 
   async collect() {

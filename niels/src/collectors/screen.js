@@ -7,13 +7,16 @@ import { Collector } from '../collector.js';
  * (taskbar/dock size derived from the difference between total and
  * available screen area) combine into a medium-entropy signal that
  * varies across device configurations.
+ *
+ * Cross-browser keys include only hardware-level properties (width, height,
+ * colorDepth, maxTouchPoints, touchSupport). availWidth/availHeight,
+ * devicePixelRatio, and screenFrame are excluded because they vary by
+ * browser chrome and zoom level.
  */
 export class ScreenCollector extends Collector {
   constructor() {
     super('screen', 'Screen and display properties', [
-      'width', 'height', 'availWidth', 'availHeight',
-      'colorDepth', 'devicePixelRatio', 'maxTouchPoints',
-      'touchSupport', 'screenFrame',
+      'width', 'height', 'colorDepth', 'maxTouchPoints', 'touchSupport',
     ]);
   }
 
