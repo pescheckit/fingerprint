@@ -7,6 +7,8 @@ export function SignalCard({ title, icon, data, stability, expanded, onToggle })
   const entries = Object.entries(data)
   const preview = entries.slice(0, 2)
   const hasMore = entries.length > 2
+  const hiddenEntries = entries.slice(2)
+  const hiddenKeys = hiddenEntries.map(([key]) => key).join(', ')
 
   return (
     <div className={`signal-card ${expanded ? 'expanded' : ''}`}>
@@ -28,7 +30,28 @@ export function SignalCard({ title, icon, data, stability, expanded, onToggle })
           </div>
         ))}
         {!expanded && hasMore && (
-          <div className="signal-more">+{entries.length - 2} more</div>
+          <div
+            className="signal-more"
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggle()
+            }}
+            title={hiddenKeys}
+          >
+            <span className="signal-more-text">+{entries.length - 2} more</span>
+            <span className="signal-more-tooltip">{hiddenKeys}</span>
+          </div>
+        )}
+        {expanded && hasMore && (
+          <div
+            className="signal-less"
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggle()
+            }}
+          >
+            <span className="signal-less-text">Show less</span>
+          </div>
         )}
       </div>
     </div>

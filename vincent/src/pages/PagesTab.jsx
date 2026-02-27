@@ -1,11 +1,104 @@
+import { useHistoryProbe } from '../hooks/useHistoryProbe'
+
 export function PagesTab({ trackedPages, pagesLoading, pagesLocal, openPages, currentTabId }) {
+  const {
+    results: probeResults,
+    summary: probeSummary,
+    loading: probeLoading,
+    runProbe,
+  } = useHistoryProbe()
+
   return (
     <section className="pages-section">
       <h2>Page Tracking</h2>
       <p className="description">
-        All pages tracked for this device.
+        Track pages and detect browsing history using fingerprinting techniques.
         {pagesLocal && <span className="local-note"> (stored locally - API unavailable)</span>}
       </p>
+
+      {/* History Probe Section */}
+      <div className="history-probe-section">
+        <h3>History Detection</h3>
+        <p className="description small">
+          Detect which popular sites may have been visited using cache timing analysis.
+          These techniques exploit browser caching behavior and timing side-channels.
+        </p>
+
+        <div className="probe-controls">
+          <button
+            className="probe-btn"
+            onClick={() => runProbe('favicon')}
+            disabled={probeLoading}
+          >
+            {probeLoading ? 'Probing...' : 'Run Cache Probe'}
+          </button>
+          <span className="probe-note">
+            Detects ~{15} popular sites via favicon cache timing
+          </span>
+        </div>
+
+        {probeResults.length > 0 && (
+          <div className="probe-results">
+            <div className="probe-summary">
+              <span className="summary-label">Detected:</span>
+              <span className="summary-value">
+                {probeSummary.probablyVisited} / {probeSummary.total} sites
+              </span>
+              {probeSummary.sites.length > 0 && (
+                <span className="summary-sites">
+                  ({probeSummary.sites.join(', ')})
+                </span>
+              )}
+            </div>
+
+            <details className="probe-details">
+              <summary>View all probe results</summary>
+              <div className="probe-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Site</th>
+                      <th>Load Time</th>
+                      <th>Detected</th>
+                      <th>Confidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {probeResults
+                      .filter(r => r.method === 'favicon_cache')
+                      .map((result, i) => (
+                        <tr key={i} className={result.probablyVisited ? 'detected' : ''}>
+                          <td>{result.site}</td>
+                          <td>
+                            {result.error ? 'Error' :
+                              result.timeout ? 'Timeout' :
+                                `${result.loadTime?.toFixed(1)}ms`}
+                          </td>
+                          <td>
+                            {result.probablyVisited ? (
+                              <span className="detected-badge">Yes</span>
+                            ) : (
+                              <span className="not-detected">No</span>
+                            )}
+                          </td>
+                          <td className={`confidence ${result.confidence}`}>
+                            {result.confidence}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+
+            <div className="probe-disclaimer">
+              <strong>Note:</strong> These results are probabilistic. Modern browsers have
+              mitigations against history sniffing. Fast load times may indicate cached
+              resources from prior visits, but this is not definitive proof.
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Currently Open Pages */}
       <div className="open-pages-section">
